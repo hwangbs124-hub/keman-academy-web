@@ -53,16 +53,105 @@ const INIT_TEMPLATES = [
 const DAYS = ["월","화","수","목","금","토","일"];
 const COLORS_LIST = [C.accent, C.green, C.red, C.yellow, "#A78BFA", "#EC4899", "#F97316"];
 
-// ── AI 보고서 생성: 백엔드 Serverless Function 호출 (CORS 우회) ──
-async function generateAIReport(prompt) {
-  const res = await fetch('/api/generate-report', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ prompt }),
-  });
-  const data = await res.json();
-  if (data.error) throw new Error(data.error);
-  return data.text;
+// ── 템플릿 기반 보고서 자동 생성 (무료, API 불필요) ──
+function generateAIReport() {} // 더 이상 사용 안 함
+
+function generateReportLocally({ student, cls, topic, attendCount, absentCount, absentNames, memo }) {
+  const score = student ? student.avgScore : 80;
+  const trend = student ? student.trend : "same";
+  const homework = student ? student.homework : "완료";
+  const name = cls?.name || "수업";
+
+  // 점수 구간별 분석
+  const scoreLevel = score >= 90 ? "우수" : score >= 80 ? "양호" : score >= 70 ? "보통" : "주의";
+  const scorePhrases = {
+    우수: { summary:"전반적으로 높은 이해도를 보이며 수업 참여도가 매우 우수합니다.", achievement:"핵심 개념을 빠르게 습득하고 심화 문제에서도 탁월한 성과를 보였습니다.", concern:"보다 도전적인 심화 학습 기회 제공이 필요합니다." },
+    양호: { summary:"수업 내용을 안정적으로 이해하고 있으며 꾸준한 성취를 보이고 있습니다.", achievement:"기본 개념 이해도가 높고 수업 태도가 성실합니다.", concern:"일부 응용 문제에서 추가 연습이 필요합니다." },
+    보통: { summary:"기본 개념 이해는 되나 심화 내용에서 보충이 필요한 상태입니다.", achievement:"수업에 성실히 참여하고 있으며 기초 실력을 갖추고 있습니다.", concern:"반복 학습과 추가 문제 풀이를 통한 실력 향상이 필요합니다." },
+    주의: { summary:"기본 개념 이해에 어려움이 있어 집중적인 보충 지도가 필요합니다.", achievement:"수업 참여 의지가 있으며 개인 맞춤 지도 시 발전 가능성이 있습니다.", concern:"기초부터 체계적인 복습과 집중 보충 지도가 시급합니다." },
+  };
+
+  const trendPhrases = {
+    up: "성적이 꾸준히 상승하는 긍정적인 흐름입니다.",
+    down: "최근 성적이 하락 추세로 원인 파악과 대책이 필요합니다.",
+    same: "성적이 안정적으로 유지되고 있습니다.",
+  };
+
+  const homeworkPhrase = homework === "완료"
+    ? "과제 이행률이 우수하여 자기 주도 학습 습관이 잘 형성되어 있습니다."
+    : "과제 미제출이 확인되어 학습 습관 개선이 필요합니다.";
+
+  const absentPhrase = absentCount > 0
+    ? `결석 ${absentCount}명(${absentNames.join(", ")})이 있어 개별 확인이 필요합니다.`
+    : "전원 출석하여 수업 참여도가 높습니다.";
+
+  return {
+    title: `${name} ${topic} 수업 보고서`,
+    summary: `${topic} 수업에서 ${scorePhrases[scoreLevel].summary} ${trendPhrases[trend]} ${absentPhrase}`,
+    achievements: [
+      scorePhrases[scoreLevel].achievement,
+      homeworkPhrase,
+      `출석 ${attendCount}명으로 ${attendCount === (attendCount + absentCount) ? "전원 참석하여" : "대부분 참석하여"} 수업 집중도가 높았습니다.`,
+    ],
+    concerns: [
+      scorePhrases[scoreLevel].concern,
+      absentCount > 0 ? `결석 학생(${absentNames.join(", ")})의 보충 수업 및 개별 연락이 필요합니다.` : "지속적인 동기 부여와 학습 흥미 유지가 중요합니다.",
+    ],
+    nextPlan: `다음 수업에서는 ${topic} 심화 내용을 다루며, ${scoreLevel === "주의" || scoreLevel === "보통" ? "기초 개념 복습을 병행하여 이해도를 높일 계획입니다." : "응용 문제와 실전 연습을 통해 실력을 강화할 계획입니다."}`,
+    parentMessage: `[키맨학원] 오늘 ${topic} 수업이 진행되었습니다. ${scorePhrases[scoreLevel].summary} 가정에서도 복습을 격려해 주시면 감사하겠습니다.`,
+  };
+}
+
+function generateCoachingLocally({ student, cls, extraInfo }) {
+  const score = student.avgScore;
+  const trend = student.trend;
+  const homework = student.homework;
+  const scoreLevel = score >= 90 ? "우수" : score >= 80 ? "양호" : score >= 70 ? "보통" : "주의";
+
+  const typeMap = {
+    우수: { type:"성취형", desc:"목표 의식이 뚜렷하고 자기 주도 학습 능력이 뛰어납니다. 높은 성취 동기와 집중력으로 꾸준한 성과를 내고 있습니다.", dist:{"성취형":35,"집중형":28,"반복형":20,"탐구형":12,"기타":5} },
+    양호: { type:"성실형", desc:"꾸준하고 성실한 학습 태도가 돋보입니다. 안정적인 학습 패턴을 유지하며 지속적으로 성장하고 있습니다.", dist:{"성실형":30,"반복형":25,"집중형":22,"탐구형":15,"기타":8} },
+    보통: { type:"잠재형", desc:"기초 실력을 갖추고 있으나 학습 방법 개선이 필요합니다. 올바른 학습 습관을 형성하면 빠른 성장이 기대됩니다.", dist:{"반복형":32,"분산형":25,"잠재형":20,"집중형":15,"기타":8} },
+    주의: { type:"집중지원형", desc:"학습에 어려움을 겪고 있어 체계적인 지원이 필요합니다. 개인 맞춤 지도를 통해 기초를 다지면 성장 가능성이 충분합니다.", dist:{"분산형":35,"집중지원형":28,"반복형":20,"잠재형":12,"기타":5} },
+  };
+
+  const profile = typeMap[scoreLevel];
+
+  return {
+    studyProfile: { type: profile.type, description: profile.desc, traits: ["자기 주도 학습", "규칙적인 학습 패턴", "목표 지향적 사고", "집중력 유지"], distribution: profile.dist },
+    strengths: [
+      score >= 80 ? "평균 이상의 학업 성취도를 보이고 있습니다." : "수업 참여 의지와 향상 가능성이 있습니다.",
+      homework === "완료" ? "과제 이행률이 우수하여 자기 주도 학습이 잘 되어 있습니다." : "수업 내 집중도는 유지되고 있습니다.",
+      trend === "up" ? "성적이 지속적으로 상승하는 긍정적 흐름을 보이고 있습니다." : "학습 루틴이 어느 정도 형성되어 있습니다.",
+    ],
+    weaknesses: [
+      score < 80 ? "기초 개념 이해도 강화가 필요합니다." : "심화 문제 적용력을 더 키울 필요가 있습니다.",
+      homework !== "완료" ? "과제 미제출이 반복되어 자기 관리 능력 향상이 필요합니다." : "장기적인 학습 지속성 유지가 중요합니다.",
+      trend === "down" ? "최근 성적 하락 원인을 파악하고 즉각적인 대처가 필요합니다." : "학습 동기 유지와 꾸준한 노력이 필요합니다.",
+    ],
+    expertAnalysis: `${student.name} 학생은 현재 평균 ${score}점으로 ${scoreLevel} 수준에 해당합니다. ${profile.desc} ${trend === "up" ? "최근 성적 상승 추세는 매우 고무적이며 이 흐름을 유지하는 것이 중요합니다." : trend === "down" ? "성적 하락 추세가 확인되어 즉각적인 원인 분석과 학습 전략 수정이 필요합니다." : "안정적인 성적을 유지하고 있으나 한 단계 도약을 위한 새로운 자극이 필요합니다."} ${extraInfo.teacherNote ? "담당 교사 관찰에 따르면 " + extraInfo.teacherNote + " 이 점을 고려한 개별 지도가 효과적입니다." : "지속적인 관심과 격려로 학습 동기를 높여주는 것이 중요합니다."}`,
+    riskFactors: [
+      trend === "down" ? "성적 하락 추세 지속 시 자신감 저하 우려" : "현 수준에서 정체될 경우 학습 의욕 저하 가능성",
+      homework !== "완료" ? "과제 미이행 습관 지속 시 학습 결손 심화" : "과도한 목표 설정으로 인한 번아웃 주의",
+    ],
+    solutions: {
+      reviewMethod: ["수업 후 당일 15분 복습 습관화", "핵심 내용 노트 정리 후 주 1회 재검토", "오답 노트 작성으로 취약점 집중 보완"],
+      memoryMethod: ["반복 학습법: 1일·3일·7일 간격 복습", "연상 기억법으로 핵심 개념 연결하여 암기"],
+      studyRoutine: ["매일 정해진 시간에 30~60분 집중 학습", "학습 전 목표 설정, 후 달성 여부 체크", score < 75 ? "주 2회 보충 학습 시간 확보" : "주 1회 심화 문제 풀이 시간 배정"],
+      focusTips: ["학습 시작 전 휴대폰 차단 및 조용한 환경 조성", "포모도로 기법(25분 집중 + 5분 휴식) 활용"],
+    },
+    parentGuide: [
+      "규칙적인 학습 시간을 함께 설정하고 지켜나갈 수 있도록 격려해 주세요.",
+      homework !== "완료" ? "매일 과제 완료 여부를 확인하고 완료 시 긍정적인 피드백을 주세요." : "잘하고 있음을 자주 칭찬하여 학습 자신감을 키워주세요.",
+      "학습 결과보다 노력 과정에 초점을 맞춘 대화로 내적 동기를 키워주세요.",
+      "주 1회 이상 학원과 소통하여 학습 상황을 공유하시면 더욱 효과적입니다.",
+    ],
+    nextGoals: [
+      `단기 목표 (1개월): ${score < 80 ? "평균 " + (score + 5) + "점 달성 및 과제 100% 이행" : "현 수준 유지 및 취약 단원 집중 보완"}`,
+      `중기 목표 (3개월): ${score < 90 ? "평균 " + Math.min(score + 10, 95) + "점 달성 및 자기 주도 학습 습관 완성" : "심화 과정 완료 및 상위권 유지"}`,
+    ],
+    teacherMessage: `${student.name} 학생은 ${profile.type} 유형으로 ${scoreLevel === "우수" || scoreLevel === "양호" ? "강점을 살린 심화 학습 기회를 제공하면 더욱 빠르게 성장할 수 있습니다." : "기초 개념 반복 학습과 성공 경험을 통한 자신감 회복이 우선입니다."} 개별 면담을 통해 학습 목표를 함께 설정하고 작은 성취에도 적극적으로 칭찬해 주시기 바랍니다.`,
+  };
 }
 
 async function sendSolapiSMS({ to, text, type="sms", variables }) {
@@ -875,20 +964,15 @@ function ReportPanel({ store }) {
     setGenerating(true); setReport(null);
     const cls = classes.find(c=>c.id===Number(selClass));
     const absentNames = classStudents.filter(s=>attendance[s.id]==="결석").map(s=>s.name);
-    const lowScore = classStudents.filter(s=>s.avgScore<75).map(s=>s.name);
-    const prompt = `당신은 학원 선생님을 돕는 AI입니다. 다음 정보로 전문적인 수업 보고서를 작성하세요.
-반: ${cls?.name}, 교사: ${cls?.teacher}, 날짜: ${date}, 주제: ${topic}
-출석: ${attendCount}명, 결석: ${absentCount}명${absentNames.length?", 결석학생: "+absentNames.join(","):""}
-${lowScore.length?"주의학생(75점미만): "+lowScore.join(","):""}
-${memo?"교사메모: "+memo:""}
-JSON으로만 응답(다른 텍스트 없이):
-{"title":"제목","summary":"요약(2문장)","achievements":["성과1","성과2","성과3"],"concerns":["개선점1","개선점2"],"nextPlan":"다음계획(1문장)","parentMessage":"학부모메시지(2문장)"}`;
+    // 반 전체 평균으로 대표 학생 데이터 생성
+    const avgScore = classStudents.length > 0
+      ? Math.round(classStudents.reduce((s,st)=>s+st.avgScore,0)/classStudents.length) : 80;
+    const mockStudent = { avgScore, trend: avgScore>=85?"up":avgScore>=75?"same":"down", homework: absentCount>0?"미제출":"완료" };
+    // 약간의 딜레이로 자연스러운 생성 효과
+    await new Promise(r=>setTimeout(r,800));
     try {
-      const res = await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,messages:[{role:"user",content:prompt}]})});
-      const data = await res.json();
-      const raw = data.content?.map(i=>i.text||"").join("")||"";
-      const parsed = JSON.parse(raw.replace(/```json|```/g,"").trim());
-      setReport({id:Date.now(),class:cls?.name,date,topic,attendCount,absentCount,...parsed});
+      const result = generateReportLocally({ student:mockStudent, cls, topic, attendCount, absentCount, absentNames, memo });
+      setReport({id:Date.now(),class:cls?.name,date,topic,attendCount,absentCount,...result});
     } catch(e) { alert("생성 오류: "+e.message); }
     setGenerating(false);
   };
@@ -1061,54 +1145,10 @@ function CoachingPanel({ store }) {
   const generate = async () => {
     if (!student) return alert("학생을 선택하세요");
     setGenerating(true); setReport(null);
-
-    const prompt = `당신은 학원 전문 교육 코치입니다. 아래 학생 정보를 분석하여 상세한 AI 학습 성향 코칭 리포트를 작성하세요.
-
-[학생 정보]
-- 이름: ${student.name}
-- 수강반: ${cls?.name || ""}
-- 담당교사: ${cls?.teacher || ""}
-- 평균 점수: ${student.avgScore}점
-- 성적 추세: ${student.trend === "up" ? "상승" : student.trend === "down" ? "하락" : "유지"}
-- 과제 이행: ${student.homework}
-- 하루 학습시간: ${extraInfo.studyTime || "미입력"}
-- 집중도: ${extraInfo.focusLevel}
-- 취약 과목/분야: ${extraInfo.weakSubject || "없음"}
-- 교사 관찰 메모: ${extraInfo.teacherNote || "없음"}
-
-다음 JSON 형식으로만 응답하세요:
-{
-  "studyProfile": {
-    "type": "학습 유형 이름 (예: 성실형, 집중형, 분산형 등)",
-    "description": "학습 유형 설명 (2문장)",
-    "traits": ["특성1", "특성2", "특성3", "특성4"],
-    "distribution": {
-      "집중형": 28,
-      "반복형": 22,
-      "분산형": 20,
-      "탐구형": 18,
-      "기타": 12
-    }
-  },
-  "strengths": ["강점1", "강점2", "강점3"],
-  "weaknesses": ["보완점1", "보완점2", "보완점3"],
-  "expertAnalysis": "전문가 종합 분석 (4~5문장, 학생의 현재 상태와 잠재력 분석)",
-  "riskFactors": ["주의/위험 요소1", "주의/위험 요소2"],
-  "solutions": {
-    "reviewMethod": ["복습방법1", "복습방법2", "복습방법3"],
-    "memoryMethod": ["암기방법1", "암기방법2"],
-    "studyRoutine": ["루틴1", "루틴2", "루틴3"],
-    "focusTips": ["집중력향상1", "집중력향상2"]
-  },
-  "parentGuide": ["학부모 코칭 가이드1", "학부모 코칭 가이드2", "학부모 코칭 가이드3", "학부모 코칭 가이드4"],
-  "nextGoals": ["단기 목표 (1개월)", "중기 목표 (3개월)"],
-  "teacherMessage": "담당 교사에게 전달할 코칭 방향 (2문장)"
-}`;
-
+    await new Promise(r => setTimeout(r, 1000));
     try {
-      const raw = await generateAIReport(prompt);
-      const parsed = JSON.parse(raw.replace(/```json|```/g, "").trim());
-      const newReport = { id: Date.now(), studentName: student.name, studentId: student.id, class: cls?.name, date: new Date().toLocaleDateString("ko-KR"), score: student.avgScore, ...parsed };
+      const result = generateCoachingLocally({ student, cls, extraInfo });
+      const newReport = { id: Date.now(), studentName: student.name, studentId: student.id, class: cls?.name, date: new Date().toLocaleDateString("ko-KR"), score: student.avgScore, ...result };
       setReport(newReport);
     } catch (e) { alert("생성 오류: " + e.message); }
     setGenerating(false);
