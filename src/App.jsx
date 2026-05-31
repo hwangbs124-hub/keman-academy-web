@@ -944,9 +944,9 @@ function SMSPanel({ store }) {
 function ReportPanel({ store }) {
   const { classes, students } = store;
   const [selClass, setSelClass] = useState("");
+  const [selStudent, setSelStudent] = useState("");
   const [date, setDate] = useState(new Date().toISOString().slice(0,10));
   const [topic, setTopic] = useState("");
-  const [attendance, setAttendance] = useState({});
   const [memo, setMemo] = useState("");
   const [generating, setGenerating] = useState(false);
   const [report, setReport] = useState(null);
@@ -955,24 +955,18 @@ function ReportPanel({ store }) {
   const [copied, setCopied] = useState(false);
 
   const classStudents = students.filter(s=>s.classId===Number(selClass));
-  const absentCount = classStudents.filter(s=>attendance[s.id]==="결석").length;
-  const attendCount = classStudents.length - absentCount;
+  const student = classStudents.find(s=>s.id===Number(selStudent));
+  const cls = classes.find(c=>c.id===Number(selClass));
 
   const generate = async () => {
     if(!selClass) return alert("반을 선택하세요");
+    if(!selStudent) return alert("학생을 선택하세요");
     if(!topic.trim()) return alert("수업 주제를 입력하세요");
     setGenerating(true); setReport(null);
-    const cls = classes.find(c=>c.id===Number(selClass));
-    const absentNames = classStudents.filter(s=>attendance[s.id]==="결석").map(s=>s.name);
-    // 반 전체 평균으로 대표 학생 데이터 생성
-    const avgScore = classStudents.length > 0
-      ? Math.round(classStudents.reduce((s,st)=>s+st.avgScore,0)/classStudents.length) : 80;
-    const mockStudent = { avgScore, trend: avgScore>=85?"up":avgScore>=75?"same":"down", homework: absentCount>0?"미제출":"완료" };
-    // 약간의 딜레이로 자연스러운 생성 효과
     await new Promise(r=>setTimeout(r,800));
     try {
-      const result = generateReportLocally({ student:mockStudent, cls, topic, attendCount, absentCount, absentNames, memo });
-      setReport({id:Date.now(),class:cls?.name,date,topic,attendCount,absentCount,...result});
+      const result = generateReportLocally({ student, cls, topic, attendCount:1, absentCount:0, absentNames:[], memo });
+      setReport({id:Date.now(), class:cls?.name, studentName:student.name, date, topic, ...result});
     } catch(e) { alert("생성 오류: "+e.message); }
     setGenerating(false);
   };
@@ -980,12 +974,12 @@ function ReportPanel({ store }) {
   const save = () => { if(report){setSaved(p=>[report,...p]);alert("저장됐습니다!");} };
   const copy = () => {
     if(!report) return;
-    navigator.clipboard.writeText(`[${report.class}] ${report.title}\n날짜: ${report.date}\n\n요약\n${report.summary}\n\n성과\n${report.achievements.join("\n")}\n\n개선점\n${report.concerns.join("\n")}\n\n다음 계획\n${report.nextPlan}\n\n학부모 메시지\n${report.parentMessage}`);
+    navigator.clipboard.writeText(`[${report.class}] ${report.studentName} - ${report.title}\n날짜: ${report.date}\n\n요약\n${report.summary}\n\n성과\n${report.achievements.join("\n")}\n\n개선점\n${report.concerns.join("\n")}\n\n다음 계획\n${report.nextPlan}\n\n학부모 메시지\n${report.parentMessage}`);
     setCopied(true); setTimeout(()=>setCopied(false),2000);
   };
 
   return <div className="fade">
-    <Hdr title="수업 보고서" sub="AI 자동 작성" />
+    <Hdr title="수업 보고서" sub="학생별 수업 보고서 자동 작성" />
     <div style={{ display:"flex", gap:4, marginBottom:18, background:C.card, borderRadius:10, padding:4, width:"fit-content", border:`1px solid ${C.border}` }}>
       {[{id:"create",label:"✦ 보고서 작성"},{id:"history",label:"◧ 저장된 보고서"}].map(t=>(
         <button key={t.id} onClick={()=>setTab(t.id)} style={{ padding:"7px 18px", borderRadius:7, fontSize:13, fontWeight:600, background:tab===t.id?C.accent:"transparent", color:tab===t.id?"#fff":C.muted, border:"none", cursor:"pointer" }}>{t.label}</button>
@@ -996,52 +990,86 @@ function ReportPanel({ store }) {
       <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
         <Card>
           <div style={{ fontSize:14, fontWeight:700, marginBottom:16 }}>수업 정보</div>
-          <Select label="반 선택" value={selClass} onChange={v=>{setSelClass(v);setAttendance({});}}
+
+          {/* 반 선택 */}
+          <Select label="① 반 선택" value={selClass} onChange={v=>{setSelClass(v);setSelStudent("");setReport(null);}}
             options={[{value:"",label:"반을 선택하세요"},...classes.map(c=>({value:c.id,label:c.name+" ("+c.teacher+")"}))]} />
-          <Input label="수업 날짜" type="date" value={date} onChange={setDate} />
-          <Input label="수업 주제" value={topic} onChange={setTopic} placeholder="예: 이차방정식 풀이" />
+
+          {/* 학생 선택 - 반 선택 후 표시 */}
+          {selClass && (
+            <div className="fade">
+              <label style={{ fontSize:11, color:C.muted, display:"block", marginBottom:5, fontWeight:500 }}>② 학생 선택</label>
+              <div style={{ display:"flex", flexDirection:"column", gap:5, marginBottom:14 }}>
+                {classStudents.map(s=>(
+                  <button key={s.id} onClick={()=>setSelStudent(String(s.id))}
+                    style={{ display:"flex", alignItems:"center", gap:10, padding:"9px 12px", borderRadius:8, border:`1.5px solid ${selStudent===String(s.id)?C.accent:C.border}`, background:selStudent===String(s.id)?C.accentSoft:"#fff", cursor:"pointer", textAlign:"left" }}>
+                    <div style={{ width:28, height:28, borderRadius:"50%", background:selStudent===String(s.id)?C.accent:C.border, display:"flex", alignItems:"center", justifyContent:"center", fontSize:11, fontWeight:700, color:selStudent===String(s.id)?"#fff":C.muted, flexShrink:0 }}>
+                      {s.name[0]}
+                    </div>
+                    <div style={{ flex:1 }}>
+                      <div style={{ fontSize:13, fontWeight:600, color:selStudent===String(s.id)?C.accent:C.text }}>{s.name}</div>
+                      <div style={{ fontSize:10, color:C.dim }}>평균 {s.avgScore}점 · {s.homework}</div>
+                    </div>
+                    {selStudent===String(s.id) && <span style={{ color:C.accent, fontSize:16 }}>✓</span>}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <Input label="③ 수업 날짜" type="date" value={date} onChange={setDate} />
+          <Input label="④ 수업 주제" value={topic} onChange={setTopic} placeholder="예: 이차방정식 풀이" />
           <div>
-            <label style={{ fontSize:11, color:C.muted, display:"block", marginBottom:5 }}>교사 메모 (선택)</label>
+            <label style={{ fontSize:11, color:C.muted, display:"block", marginBottom:5 }}>⑤ 교사 메모 (선택)</label>
             <textarea value={memo} onChange={e=>setMemo(e.target.value)} rows={3} placeholder="특이사항, 학생 반응 등"
               style={{ width:"100%", border:`1px solid ${C.border}`, borderRadius:8, padding:"9px 12px", fontSize:13, resize:"vertical" }} />
           </div>
         </Card>
-        {selClass && <Card>
-          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12 }}>
-            <div style={{ fontSize:14, fontWeight:700 }}>출석 체크</div>
-            <span style={{ fontSize:12, color:C.muted }}>출석 <b style={{color:C.green}}>{attendCount}</b> / 결석 <b style={{color:C.red}}>{absentCount}</b></span>
-          </div>
-          {classStudents.map(s=>(
-            <div key={s.id} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"8px 10px", borderRadius:8, marginBottom:5, background:attendance[s.id]==="결석"?C.redSoft:C.bg }}>
-              <span style={{ fontSize:13, fontWeight:600, color:attendance[s.id]==="결석"?C.red:C.text }}>{s.name}</span>
-              <button onClick={()=>setAttendance(p=>({...p,[s.id]:p[s.id]==="결석"?"출석":"결석"}))}
-                style={{ fontSize:11, padding:"4px 12px", borderRadius:6, fontWeight:600, border:"none", cursor:"pointer", background:attendance[s.id]==="결석"?C.red:C.greenSoft, color:attendance[s.id]==="결석"?"#fff":C.green }}>
-                {attendance[s.id]==="결석"?"결석":"출석"}
-              </button>
+
+        {/* 선택된 학생 요약 */}
+        {student && (
+          <Card className="fade" style={{ borderLeft:`3px solid ${C.accent}`, padding:"14px 16px" }}>
+            <div style={{ fontSize:11, color:C.muted, marginBottom:8 }}>선택된 학생</div>
+            <div style={{ fontSize:15, fontWeight:700, marginBottom:6 }}>{student.name}</div>
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:6 }}>
+              {[
+                ["평균 점수", student.avgScore+"점", student.avgScore>=90?C.green:student.avgScore>=75?C.accent:C.yellow],
+                ["성적 추세", student.trend==="up"?"↑ 상승":student.trend==="down"?"↓ 하락":"→ 유지", student.trend==="up"?C.green:student.trend==="down"?C.red:C.muted],
+                ["과제", student.homework, student.homework==="완료"?C.green:C.red],
+                ["연락처", student.parentPhone||"-", C.muted],
+              ].map(([k,v,col])=>(
+                <div key={k} style={{ background:C.bg, borderRadius:8, padding:"8px 10px" }}>
+                  <div style={{ fontSize:10, color:C.dim, marginBottom:2 }}>{k}</div>
+                  <div style={{ fontSize:12, fontWeight:700, color:col }}>{v}</div>
+                </div>
+              ))}
             </div>
-          ))}
-        </Card>}
-        <button className="bt" onClick={generate} disabled={generating} style={{ padding:"14px", borderRadius:12, fontSize:14, fontWeight:700, border:"none", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:8, background:generating?C.border:"linear-gradient(135deg,#3B7EF6,#6366F1)", color:generating?C.muted:"#fff", boxShadow:generating?"none":"0 4px 16px rgba(59,126,246,0.3)" }}>
-          {generating?<><span className="spin" style={{display:"inline-block"}}>⟳</span> AI 작성 중...</>:"✦ AI 보고서 자동 생성"}
+          </Card>
+        )}
+
+        <button className="bt" onClick={generate} disabled={generating||!selStudent} style={{ padding:"14px", borderRadius:12, fontSize:14, fontWeight:700, border:"none", cursor:selStudent?"pointer":"not-allowed", display:"flex", alignItems:"center", justifyContent:"center", gap:8, background:generating||!selStudent?C.border:"linear-gradient(135deg,#3B7EF6,#6366F1)", color:generating||!selStudent?C.muted:"#fff", boxShadow:generating||!selStudent?"none":"0 4px 16px rgba(59,126,246,0.3)" }}>
+          {generating?<><span className="spin" style={{display:"inline-block"}}>⟳</span> 작성 중...</>:selStudent?"✦ 보고서 자동 생성":"학생을 먼저 선택하세요"}
         </button>
       </div>
 
       <div>
         {!report&&!generating && <Card style={{ minHeight:400, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:14, border:`1px dashed ${C.border}` }}>
           <div style={{ fontSize:36, opacity:0.2 }}>◧</div>
-          <div style={{ fontSize:13, color:C.dim, textAlign:"center", lineHeight:1.8 }}>수업 정보 입력 후<br/><b style={{color:C.muted}}>AI 보고서 자동 생성</b> 버튼을 누르세요</div>
+          <div style={{ fontSize:13, color:C.dim, textAlign:"center", lineHeight:1.9 }}>
+            반 → 학생 → 수업 주제 선택 후<br/><b style={{color:C.muted}}>보고서 자동 생성</b> 버튼을 누르세요
+          </div>
         </Card>}
         {generating && <Card style={{ minHeight:400, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:16 }}>
           <div style={{ position:"relative", width:50, height:50 }}>
             <div className="spin" style={{ position:"absolute", inset:0, border:`3px solid ${C.accent}`, borderTopColor:"transparent", borderRadius:"50%" }} />
           </div>
-          <div style={{ fontSize:13, color:C.muted }}>AI가 보고서를 작성하고 있습니다...</div>
+          <div style={{ fontSize:13, color:C.muted }}>보고서를 작성하고 있습니다...</div>
         </Card>}
         {report&&!generating && <Card className="fade" style={{ border:`1px solid ${C.accent}30` }}>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:16 }}>
             <div>
               <div style={{ fontSize:16, fontWeight:800 }}>{report.title}</div>
-              <div style={{ fontSize:11, color:C.muted, marginTop:3 }}>{report.date} · {report.class} · 출석 {report.attendCount}명</div>
+              <div style={{ fontSize:11, color:C.muted, marginTop:3 }}>{report.date} · {report.class} · {report.studentName}</div>
             </div>
             <div style={{ display:"flex", gap:8 }}>
               <Btn small outline onClick={copy}>{copied?"✓ 복사됨":"복사"}</Btn>
@@ -1072,9 +1100,9 @@ function ReportPanel({ store }) {
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:8 }}>
               <div>
                 <div style={{ fontSize:15, fontWeight:700 }}>{r.title||r.class+" 수업 보고서"}</div>
-                <div style={{ fontSize:12, color:C.muted, marginTop:3 }}>{r.date} · {r.class} · {r.topic}</div>
+                <div style={{ fontSize:12, color:C.muted, marginTop:3 }}>{r.date} · {r.class} · {r.studentName||""} · {r.topic}</div>
               </div>
-              <Badge>{r.attendCount}명 출석</Badge>
+              <Badge>{r.studentName||"전체"}</Badge>
             </div>
             <p style={{ fontSize:13, color:C.muted, lineHeight:1.7 }}>{r.summary}</p>
           </Card>
@@ -1130,6 +1158,7 @@ function SettingsPanel({ store }) {
 // ── AI 학습 성향 코칭 리포트 ──
 function CoachingPanel({ store }) {
   const { classes, students } = store;
+  const [selClass, setSelClass] = useState("");
   const [selStudent, setSelStudent] = useState("");
   const [extraInfo, setExtraInfo] = useState({ studyTime:"", focusLevel:"보통", weakSubject:"", teacherNote:"" });
   const [generating, setGenerating] = useState(false);
@@ -1139,8 +1168,9 @@ function CoachingPanel({ store }) {
   const [copied, setCopied] = useState(false);
   const [printMode, setPrintMode] = useState(false);
 
-  const student = students.find(s => s.id === Number(selStudent));
-  const cls = student ? classes.find(c => c.id === student.classId) : null;
+  const classStudents = students.filter(s => s.classId === Number(selClass));
+  const student = classStudents.find(s => s.id === Number(selStudent));
+  const cls = classes.find(c => c.id === Number(selClass));
 
   const generate = async () => {
     if (!student) return alert("학생을 선택하세요");
@@ -1238,13 +1268,35 @@ ${report.teacherMessage}`;
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             <Card>
               <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 16 }}>학생 선택</div>
-              <Select label="학생" value={selStudent} onChange={setSelStudent}
-                options={[{ value: "", label: "학생을 선택하세요" }, ...students.map(s => {
-                  const c = classes.find(cl => cl.id === s.classId);
-                  return { value: s.id, label: `${s.name} (${c?.name || ""})` };
-                })]} />
+
+              {/* 반 선택 */}
+              <Select label="① 반 선택" value={selClass} onChange={v=>{setSelClass(v);setSelStudent("");setReport(null);}}
+                options={[{value:"",label:"반을 선택하세요"},...classes.map(c=>({value:c.id,label:c.name+" ("+c.teacher+")"}))]} />
+
+              {/* 학생 선택 */}
+              {selClass && (
+                <div className="fade">
+                  <label style={{ fontSize:11, color:C.muted, display:"block", marginBottom:6, fontWeight:500 }}>② 학생 선택</label>
+                  <div style={{ display:"flex", flexDirection:"column", gap:5, marginBottom:14 }}>
+                    {classStudents.map(s=>(
+                      <button key={s.id} onClick={()=>setSelStudent(String(s.id))}
+                        style={{ display:"flex", alignItems:"center", gap:10, padding:"9px 12px", borderRadius:8, border:`1.5px solid ${selStudent===String(s.id)?C.accent:C.border}`, background:selStudent===String(s.id)?C.accentSoft:"#fff", cursor:"pointer", textAlign:"left" }}>
+                        <div style={{ width:28, height:28, borderRadius:"50%", background:selStudent===String(s.id)?C.accent:C.border, display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, fontWeight:700, color:selStudent===String(s.id)?"#fff":C.muted, flexShrink:0 }}>
+                          {s.name[0]}
+                        </div>
+                        <div style={{ flex:1 }}>
+                          <div style={{ fontSize:13, fontWeight:600, color:selStudent===String(s.id)?C.accent:C.text }}>{s.name}</div>
+                          <div style={{ fontSize:10, color:C.dim }}>평균 {s.avgScore}점 · {s.trend==="up"?"↑상승":s.trend==="down"?"↓하락":"→유지"} · {s.homework}</div>
+                        </div>
+                        {selStudent===String(s.id) && <span style={{ color:C.accent }}>✓</span>}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {student && (
-                <div className="fade" style={{ background: C.bg, borderRadius: 10, padding: "12px 14px", marginTop: 4 }}>
+                <div className="fade" style={{ background: C.bg, borderRadius: 10, padding: "12px 14px" }}>
                   {[
                     ["평균 점수", student.avgScore + "점", student.avgScore >= 90 ? C.green : student.avgScore >= 75 ? C.accent : C.yellow],
                     ["성적 추세", student.trend === "up" ? "↑ 상승" : student.trend === "down" ? "↓ 하락" : "→ 유지", student.trend === "up" ? C.green : student.trend === "down" ? C.red : C.muted],
@@ -1271,9 +1323,9 @@ ${report.teacherMessage}`;
                   style={{ width: "100%", border: `1px solid ${C.border}`, borderRadius: 8, padding: "9px 12px", fontSize: 13, resize: "vertical" }} />
               </div>
             </Card>
-            <button className="bt" onClick={generate} disabled={generating}
-              style={{ padding: "14px", borderRadius: 12, fontSize: 14, fontWeight: 700, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: generating ? C.border : "linear-gradient(135deg,#3B7EF6,#A78BFA)", color: generating ? C.muted : "#fff", boxShadow: generating ? "none" : "0 4px 16px rgba(59,126,246,0.3)" }}>
-              {generating ? <><span className="spin" style={{ display: "inline-block" }}>⟳</span> AI 분석 중...</> : "★ AI 코칭 리포트 생성"}
+            <button className="bt" onClick={generate} disabled={generating||!student}
+              style={{ padding: "14px", borderRadius: 12, fontSize: 14, fontWeight: 700, border: "none", cursor: student?"pointer":"not-allowed", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: generating||!student ? C.border : "linear-gradient(135deg,#3B7EF6,#A78BFA)", color: generating||!student ? C.muted : "#fff", boxShadow: generating||!student ? "none" : "0 4px 16px rgba(59,126,246,0.3)" }}>
+              {generating ? <><span className="spin" style={{ display: "inline-block" }}>⟳</span> 분석 중...</> : student ? "★ AI 코칭 리포트 생성" : "학생을 먼저 선택하세요"}
             </button>
           </div>
 
@@ -1283,7 +1335,7 @@ ${report.teacherMessage}`;
               <Card style={{ minHeight: 500, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, border: `1px dashed ${C.border}` }}>
                 <div style={{ fontSize: 48, opacity: 0.15 }}>★</div>
                 <div style={{ fontSize: 14, color: C.dim, textAlign: "center", lineHeight: 1.9 }}>
-                  학생을 선택하고<br /><b style={{ color: C.muted }}>AI 코칭 리포트 생성</b> 버튼을 누르세요<br />
+                  반 → 학생 선택 후<br /><b style={{ color: C.muted }}>AI 코칭 리포트 생성</b> 버튼을 누르세요<br />
                   <span style={{ fontSize: 12 }}>학습 유형 · 강점 · 보완점 · 맞춤 솔루션<br />학부모 가이드까지 자동 생성됩니다</span>
                 </div>
               </Card>
