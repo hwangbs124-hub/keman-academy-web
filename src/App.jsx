@@ -53,6 +53,18 @@ const INIT_TEMPLATES = [
 const DAYS = ["월","화","수","목","금","토","일"];
 const COLORS_LIST = [C.accent, C.green, C.red, C.yellow, "#A78BFA", "#EC4899", "#F97316"];
 
+// ── AI 보고서 생성: 백엔드 Serverless Function 호출 (CORS 우회) ──
+async function generateAIReport(prompt) {
+  const res = await fetch('/api/generate-report', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prompt }),
+  });
+  const data = await res.json();
+  if (data.error) throw new Error(data.error);
+  return data.text;
+}
+
 async function sendSolapiSMS({ to, text, type="sms", variables }) {
   const res = await fetch("/api/send-sms", {
     method:"POST", headers:{"Content-Type":"application/json"},
@@ -70,6 +82,7 @@ const NAV = [
   { id:"notice",    icon:"◉", label:"공지/메시지" },
   { id:"sms",       icon:"✉", label:"문자 발송" },
   { id:"report",    icon:"◧", label:"수업 보고서" },
+  { id:"coaching",  icon:"★", label:"코칭 리포트" },
   { id:"settings",  icon:"⚙", label:"설정" },
 ];
 
@@ -134,6 +147,7 @@ export default function App() {
         {nav==="notice"    && <NoticePanel store={store} />}
         {nav==="sms"       && <SMSPanel store={store} />}
         {nav==="report"    && <ReportPanel store={store} />}
+        {nav==="coaching"  && <CoachingPanel store={store} />}
         {nav==="settings"  && <SettingsPanel store={store} />}
       </main>
     </div>
@@ -250,10 +264,14 @@ function Dashboard({ store, setNav }) {
 // ── 학생 관리 ──
 function StudentsPanel({ store }) {
   const { classes, students, setStudents } = store;
-  const [modal, setModal] = useState(null); // null | "add" | student obj
+  const [modal, setModal] = useState(null);
   const [form, setForm] = useState({});
   const [search, setSearch] = useState("");
   const [filterClass, setFilterClass] = useState("all");
+  const [xlsxModal, setXlsxModal] = useState(false);
+  const [xlsxPreview, setXlsxPreview] = useState([]);
+  const [xlsxMode, setXlsxMode] = useState("add"); // "add" | "replace"
+  const [xlsxError, setXlsxError] = useState("");
 
   const open = (s) => { setForm(s ? {...s} : { name:"", classId:classes[0]?.id||1, avgScore:80, homework:"완료", trend:"same", parentPhone:"" }); setModal(s||"add"); };
   const save = () => {
@@ -263,6 +281,58 @@ function StudentsPanel({ store }) {
     setModal(null);
   };
   const del = (id) => { if(confirm("삭제하시겠습니까?")) setStudents(p=>p.filter(s=>s.id!==id)); };
+
+  // 엑셀 다운로드 (양식)
+  const downloadTemplate = () => {
+    const rows = [
+      ["이름","반이름","학부모연락처","평균점수","과제상태","성적추세"],
+      ["홍길동","수학 심화반","010-1234-5678","85","완료","up"],
+      ["김영희","영어 회화반","010-9876-5432","92","완료","up"],
+    ];
+    const csv = rows.map(r => r.join(",")).join("\n");
+    const blob = new Blob(["\uFEFF"+csv], { type:"text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href=url; a.download="학생목록_양식.csv"; a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // CSV/엑셀 파일 파싱
+  const handleFile = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setXlsxError("");
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const text = ev.target.result;
+        const lines = text.split(/\r?\n/).filter(l => l.trim());
+        const headers = lines[0].split(",").map(h => h.trim().replace(/"/g,""));
+        const dataRows = lines.slice(1);
+        const parsed = dataRows.map((line, i) => {
+          const cols = line.split(",").map(c => c.trim().replace(/"/g,""));
+          const name = cols[0] || "";
+          const className = cols[1] || "";
+          const parentPhone = cols[2] || "";
+          const avgScore = Number(cols[3]) || 80;
+          const homework = cols[4] === "미제출" ? "미제출" : "완료";
+          const trend = ["up","down","same"].includes(cols[5]) ? cols[5] : "same";
+          const cls = classes.find(c => c.name === className);
+          return { id: Date.now()+i, name, classId: cls?.id || classes[0]?.id, className: className||"미지정", parentPhone, avgScore, homework, trend };
+        }).filter(r => r.name);
+        if (parsed.length === 0) { setXlsxError("학생 데이터가 없습니다. 양식을 확인해주세요."); return; }
+        setXlsxPreview(parsed);
+      } catch(err) { setXlsxError("파일 파싱 오류: " + err.message); }
+    };
+    reader.readAsText(file, "UTF-8");
+    e.target.value = "";
+  };
+
+  const applyXlsx = () => {
+    const toAdd = xlsxPreview.map(({className, ...s}) => s);
+    if (xlsxMode === "replace") setStudents(toAdd);
+    else setStudents(p => [...p, ...toAdd]);
+    setXlsxModal(false); setXlsxPreview([]);
+  };
 
   const filtered = students.filter(s => {
     const cls = classes.find(c=>c.id===s.classId);
@@ -281,6 +351,8 @@ function StudentsPanel({ store }) {
           <option value="all">전체 반</option>
           {classes.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
+        <Btn outline color={C.green} onClick={downloadTemplate}>📥 양식 다운로드</Btn>
+        <Btn outline color={C.accent} onClick={()=>{setXlsxModal(true);setXlsxPreview([]);setXlsxError("");}}>📤 엑셀 업로드</Btn>
         <Btn onClick={()=>open(null)}>+ 학생 추가</Btn>
       </div>
     </Card>
@@ -320,6 +392,80 @@ function StudentsPanel({ store }) {
       </table>
       {filtered.length===0 && <div style={{ textAlign:"center", padding:"32px", color:C.dim }}>학생이 없습니다</div>}
     </Card>
+
+    {/* 엑셀 업로드 모달 */}
+    {xlsxModal && <Modal title="📤 엑셀/CSV 업로드" onClose={()=>setXlsxModal(false)}>
+      {/* 안내 */}
+      <div style={{ background:C.accentSoft, borderRadius:10, padding:"12px 14px", marginBottom:16, fontSize:12, color:C.accent, lineHeight:1.8 }}>
+        <b>양식 안내</b><br/>
+        열 순서: 이름 / 반이름 / 학부모연락처 / 평균점수 / 과제상태 / 성적추세<br/>
+        과제상태: <b>완료</b> 또는 <b>미제출</b><br/>
+        성적추세: <b>up</b>(상승) / <b>down</b>(하락) / <b>same</b>(유지)<br/>
+        반이름은 앱에 등록된 반 이름과 정확히 일치해야 합니다.
+      </div>
+
+      {/* 파일 업로드 */}
+      {xlsxPreview.length === 0 && <>
+        <label style={{ display:"block", border:`2px dashed ${C.border}`, borderRadius:12, padding:"28px", textAlign:"center", cursor:"pointer", marginBottom:14, background:C.bg }}>
+          <div style={{ fontSize:28, marginBottom:8 }}>📂</div>
+          <div style={{ fontSize:13, fontWeight:600, color:C.text, marginBottom:4 }}>CSV 파일을 클릭하여 선택</div>
+          <div style={{ fontSize:11, color:C.muted }}>엑셀에서 CSV로 저장 후 업로드 (.csv)</div>
+          <input type="file" accept=".csv,.txt" onChange={handleFile} style={{ display:"none" }} />
+        </label>
+        {xlsxError && <div style={{ color:C.red, fontSize:12, marginBottom:12, padding:"8px 12px", background:C.redSoft, borderRadius:8 }}>⚠ {xlsxError}</div>}
+        <div style={{ textAlign:"center" }}>
+          <button onClick={downloadTemplate} style={{ fontSize:12, color:C.accent, textDecoration:"underline", background:"none", border:"none", cursor:"pointer" }}>
+            📥 양식 CSV 다운로드
+          </button>
+        </div>
+      </>}
+
+      {/* 미리보기 */}
+      {xlsxPreview.length > 0 && <>
+        <div style={{ fontSize:13, fontWeight:700, marginBottom:10, color:C.green }}>✓ {xlsxPreview.length}명 인식됨 — 미리보기</div>
+        <div style={{ maxHeight:240, overflowY:"auto", border:`1px solid ${C.border}`, borderRadius:10, marginBottom:14 }}>
+          <table style={{ width:"100%", borderCollapse:"collapse" }}>
+            <thead><tr style={{ background:C.bg, borderBottom:`1px solid ${C.border}` }}>
+              {["이름","반","연락처","점수","과제","추세"].map(h=><th key={h} style={{ padding:"7px 10px", fontSize:11, color:C.muted, textAlign:"left", fontWeight:500 }}>{h}</th>)}
+            </tr></thead>
+            <tbody>
+              {xlsxPreview.map((s,i)=>(
+                <tr key={i} style={{ borderBottom:`1px solid ${C.border}22` }}>
+                  <td style={{ padding:"7px 10px", fontSize:12, fontWeight:600 }}>{s.name}</td>
+                  <td style={{ padding:"7px 10px", fontSize:11, color:C.muted }}>{s.className}</td>
+                  <td style={{ padding:"7px 10px", fontSize:11, color:C.muted }}>{s.parentPhone||"-"}</td>
+                  <td style={{ padding:"7px 10px", fontSize:12, fontWeight:700, color:s.avgScore>=90?C.green:s.avgScore>=75?C.accent:C.yellow }}>{s.avgScore}</td>
+                  <td style={{ padding:"7px 10px" }}><Badge color={s.homework==="완료"?C.green:C.red}>{s.homework}</Badge></td>
+                  <td style={{ padding:"7px 10px", fontSize:13 }}>{s.trend==="up"?"↑":s.trend==="down"?"↓":"→"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* 추가 방식 선택 */}
+        <div style={{ marginBottom:16 }}>
+          <div style={{ fontSize:12, fontWeight:600, color:C.text, marginBottom:8 }}>업로드 방식</div>
+          <div style={{ display:"flex", gap:10 }}>
+            {[{id:"add",label:"➕ 기존 학생에 추가"},{id:"replace",label:"🔄 전체 교체"}].map(opt=>(
+              <label key={opt.id} style={{ flex:1, display:"flex", alignItems:"center", gap:8, padding:"10px 14px", borderRadius:8, cursor:"pointer", border:`1.5px solid ${xlsxMode===opt.id?C.accent:C.border}`, background:xlsxMode===opt.id?C.accentSoft:"#fff" }}>
+                <input type="radio" checked={xlsxMode===opt.id} onChange={()=>setXlsxMode(opt.id)} style={{accentColor:C.accent}} />
+                <span style={{ fontSize:12, fontWeight:600, color:xlsxMode===opt.id?C.accent:C.text }}>{opt.label}</span>
+              </label>
+            ))}
+          </div>
+          {xlsxMode==="replace" && <div style={{ fontSize:11, color:C.red, marginTop:6 }}>⚠ 기존 학생 데이터가 모두 삭제되고 업로드 데이터로 교체됩니다.</div>}
+        </div>
+
+        <div style={{ display:"flex", gap:10, justifyContent:"space-between" }}>
+          <button onClick={()=>setXlsxPreview([])} style={{ fontSize:12, color:C.muted, background:"none", border:"none", cursor:"pointer" }}>← 다시 선택</button>
+          <div style={{ display:"flex", gap:10 }}>
+            <Btn outline color={C.muted} onClick={()=>setXlsxModal(false)}>취소</Btn>
+            <Btn onClick={applyXlsx}>{xlsxMode==="replace"?"전체 교체하기":`${xlsxPreview.length}명 추가하기`}</Btn>
+          </div>
+        </div>
+      </>}
+    </Modal>}
 
     {modal && <Modal title={modal==="add"?"학생 추가":"학생 수정"} onClose={()=>setModal(null)}>
       <Input label="이름" value={form.name||""} onChange={v=>setForm(p=>({...p,name:v}))} placeholder="학생 이름" />
@@ -895,4 +1041,351 @@ function SettingsPanel({ store }) {
       </Card>
     </div>
   </div>;
+}
+
+// ── AI 학습 성향 코칭 리포트 ──
+function CoachingPanel({ store }) {
+  const { classes, students } = store;
+  const [selStudent, setSelStudent] = useState("");
+  const [extraInfo, setExtraInfo] = useState({ studyTime:"", focusLevel:"보통", weakSubject:"", teacherNote:"" });
+  const [generating, setGenerating] = useState(false);
+  const [report, setReport] = useState(null);
+  const [saved, setSaved] = useStore("km_coaching", []);
+  const [tab, setTab] = useState("create");
+  const [copied, setCopied] = useState(false);
+  const [printMode, setPrintMode] = useState(false);
+
+  const student = students.find(s => s.id === Number(selStudent));
+  const cls = student ? classes.find(c => c.id === student.classId) : null;
+
+  const generate = async () => {
+    if (!student) return alert("학생을 선택하세요");
+    setGenerating(true); setReport(null);
+
+    const prompt = `당신은 학원 전문 교육 코치입니다. 아래 학생 정보를 분석하여 상세한 AI 학습 성향 코칭 리포트를 작성하세요.
+
+[학생 정보]
+- 이름: ${student.name}
+- 수강반: ${cls?.name || ""}
+- 담당교사: ${cls?.teacher || ""}
+- 평균 점수: ${student.avgScore}점
+- 성적 추세: ${student.trend === "up" ? "상승" : student.trend === "down" ? "하락" : "유지"}
+- 과제 이행: ${student.homework}
+- 하루 학습시간: ${extraInfo.studyTime || "미입력"}
+- 집중도: ${extraInfo.focusLevel}
+- 취약 과목/분야: ${extraInfo.weakSubject || "없음"}
+- 교사 관찰 메모: ${extraInfo.teacherNote || "없음"}
+
+다음 JSON 형식으로만 응답하세요:
+{
+  "studyProfile": {
+    "type": "학습 유형 이름 (예: 성실형, 집중형, 분산형 등)",
+    "description": "학습 유형 설명 (2문장)",
+    "traits": ["특성1", "특성2", "특성3", "특성4"],
+    "distribution": {
+      "집중형": 28,
+      "반복형": 22,
+      "분산형": 20,
+      "탐구형": 18,
+      "기타": 12
+    }
+  },
+  "strengths": ["강점1", "강점2", "강점3"],
+  "weaknesses": ["보완점1", "보완점2", "보완점3"],
+  "expertAnalysis": "전문가 종합 분석 (4~5문장, 학생의 현재 상태와 잠재력 분석)",
+  "riskFactors": ["주의/위험 요소1", "주의/위험 요소2"],
+  "solutions": {
+    "reviewMethod": ["복습방법1", "복습방법2", "복습방법3"],
+    "memoryMethod": ["암기방법1", "암기방법2"],
+    "studyRoutine": ["루틴1", "루틴2", "루틴3"],
+    "focusTips": ["집중력향상1", "집중력향상2"]
+  },
+  "parentGuide": ["학부모 코칭 가이드1", "학부모 코칭 가이드2", "학부모 코칭 가이드3", "학부모 코칭 가이드4"],
+  "nextGoals": ["단기 목표 (1개월)", "중기 목표 (3개월)"],
+  "teacherMessage": "담당 교사에게 전달할 코칭 방향 (2문장)"
+}`;
+
+    try {
+      const raw = await generateAIReport(prompt);
+      const parsed = JSON.parse(raw.replace(/```json|```/g, "").trim());
+      const newReport = { id: Date.now(), studentName: student.name, studentId: student.id, class: cls?.name, date: new Date().toLocaleDateString("ko-KR"), score: student.avgScore, ...parsed };
+      setReport(newReport);
+    } catch (e) { alert("생성 오류: " + e.message); }
+    setGenerating(false);
+  };
+
+  const save = () => { if (report) { setSaved(p => [report, ...p]); alert("저장됐습니다!"); } };
+
+  const copy = () => {
+    if (!report) return;
+    const text = `[AI 학습 성향 코칭 리포트]
+학생: ${report.studentName} | 반: ${report.class} | 날짜: ${report.date}
+
+▶ 학습 유형: ${report.studyProfile?.type}
+${report.studyProfile?.description}
+
+▶ 강점
+${report.strengths?.join("\n")}
+
+▶ 보완점
+${report.weaknesses?.join("\n")}
+
+▶ 전문가 분석
+${report.expertAnalysis}
+
+▶ 맞춤 학습 솔루션
+복습: ${report.solutions?.reviewMethod?.join(", ")}
+암기: ${report.solutions?.memoryMethod?.join(", ")}
+루틴: ${report.solutions?.studyRoutine?.join(", ")}
+
+▶ 학부모 코칭 가이드
+${report.parentGuide?.join("\n")}
+
+▶ 교사 메시지
+${report.teacherMessage}`;
+    navigator.clipboard.writeText(text);
+    setCopied(true); setTimeout(() => setCopied(false), 2000);
+  };
+
+  // 도넛 차트 SVG
+  const DonutChart = ({ data }) => {
+    const entries = Object.entries(data || {});
+    const total = entries.reduce((s, [, v]) => s + v, 0);
+    const colors = [C.accent, C.green, C.yellow, C.red, "#A78BFA"];
+    let cumulative = 0;
+    const r = 60, cx = 80, cy = 80, stroke = 28;
+    const circumference = 2 * Math.PI * r;
+    return (
+      <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
+        <svg width={160} height={160}>
+          {entries.map(([label, val], i) => {
+            const pct = val / total;
+            const offset = circumference * (1 - cumulative);
+            cumulative += pct;
+            return <circle key={i} cx={cx} cy={cy} r={r} fill="none" stroke={colors[i % colors.length]}
+              strokeWidth={stroke} strokeDasharray={`${circumference * pct} ${circumference * (1 - pct)}`}
+              strokeDashoffset={offset} style={{ transition: "all 0.5s" }} transform={`rotate(-90 ${cx} ${cy})`} />;
+          })}
+          <text x={cx} y={cy - 6} textAnchor="middle" style={{ fontSize: 11, fill: C.muted }}>학습유형</text>
+          <text x={cx} y={cy + 10} textAnchor="middle" style={{ fontSize: 10, fill: C.dim }}>분포</text>
+        </svg>
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {entries.map(([label, val], i) => (
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 7 }}>
+              <div style={{ width: 10, height: 10, borderRadius: 3, background: colors[i % colors.length], flexShrink: 0 }} />
+              <span style={{ fontSize: 11, color: C.muted }}>{label}</span>
+              <span style={{ fontSize: 11, fontWeight: 700, color: C.text, marginLeft: "auto" }}>{val}%</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="fade">
+      <Hdr title="AI 학습 성향 코칭 리포트" sub="학생별 맞춤 학습 분석 및 코칭" />
+
+      <div style={{ display: "flex", gap: 4, marginBottom: 18, background: C.card, borderRadius: 10, padding: 4, width: "fit-content", border: `1px solid ${C.border}` }}>
+        {[{ id: "create", label: "★ 리포트 생성" }, { id: "history", label: "◧ 저장된 리포트" }].map(t => (
+          <button key={t.id} onClick={() => setTab(t.id)} style={{ padding: "7px 18px", borderRadius: 7, fontSize: 13, fontWeight: 600, background: tab === t.id ? C.accent : "transparent", color: tab === t.id ? "#fff" : C.muted, border: "none", cursor: "pointer" }}>{t.label}</button>
+        ))}
+      </div>
+
+      {tab === "create" && (
+        <div style={{ display: "grid", gridTemplateColumns: "300px 1fr", gap: 18 }}>
+          {/* 입력 폼 */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <Card>
+              <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 16 }}>학생 선택</div>
+              <Select label="학생" value={selStudent} onChange={setSelStudent}
+                options={[{ value: "", label: "학생을 선택하세요" }, ...students.map(s => {
+                  const c = classes.find(cl => cl.id === s.classId);
+                  return { value: s.id, label: `${s.name} (${c?.name || ""})` };
+                })]} />
+              {student && (
+                <div className="fade" style={{ background: C.bg, borderRadius: 10, padding: "12px 14px", marginTop: 4 }}>
+                  {[
+                    ["평균 점수", student.avgScore + "점", student.avgScore >= 90 ? C.green : student.avgScore >= 75 ? C.accent : C.yellow],
+                    ["성적 추세", student.trend === "up" ? "↑ 상승" : student.trend === "down" ? "↓ 하락" : "→ 유지", student.trend === "up" ? C.green : student.trend === "down" ? C.red : C.muted],
+                    ["과제 이행", student.homework, student.homework === "완료" ? C.green : C.red],
+                  ].map(([k, v, col]) => (
+                    <div key={k} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 6 }}>
+                      <span style={{ color: C.muted }}>{k}</span>
+                      <span style={{ fontWeight: 700, color: col }}>{v}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Card>
+            <Card>
+              <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 16 }}>추가 정보 (선택)</div>
+              <Input label="하루 학습 시간" value={extraInfo.studyTime} onChange={v => setExtraInfo(p => ({ ...p, studyTime: v }))} placeholder="예: 2시간" />
+              <Select label="수업 집중도" value={extraInfo.focusLevel} onChange={v => setExtraInfo(p => ({ ...p, focusLevel: v }))}
+                options={[{ value: "매우 높음", label: "매우 높음" }, { value: "높음", label: "높음" }, { value: "보통", label: "보통" }, { value: "낮음", label: "낮음" }, { value: "매우 낮음", label: "매우 낮음" }]} />
+              <Input label="취약 과목/분야" value={extraInfo.weakSubject} onChange={v => setExtraInfo(p => ({ ...p, weakSubject: v }))} placeholder="예: 서술형 문제, 단어 암기" />
+              <div style={{ marginBottom: 14 }}>
+                <label style={{ fontSize: 11, color: C.muted, display: "block", marginBottom: 5 }}>교사 관찰 메모</label>
+                <textarea value={extraInfo.teacherNote} onChange={e => setExtraInfo(p => ({ ...p, teacherNote: e.target.value }))} rows={3}
+                  placeholder="학생의 수업 태도, 특이사항 등"
+                  style={{ width: "100%", border: `1px solid ${C.border}`, borderRadius: 8, padding: "9px 12px", fontSize: 13, resize: "vertical" }} />
+              </div>
+            </Card>
+            <button className="bt" onClick={generate} disabled={generating}
+              style={{ padding: "14px", borderRadius: 12, fontSize: 14, fontWeight: 700, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: generating ? C.border : "linear-gradient(135deg,#3B7EF6,#A78BFA)", color: generating ? C.muted : "#fff", boxShadow: generating ? "none" : "0 4px 16px rgba(59,126,246,0.3)" }}>
+              {generating ? <><span className="spin" style={{ display: "inline-block" }}>⟳</span> AI 분석 중...</> : "★ AI 코칭 리포트 생성"}
+            </button>
+          </div>
+
+          {/* 리포트 결과 */}
+          <div>
+            {!report && !generating && (
+              <Card style={{ minHeight: 500, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, border: `1px dashed ${C.border}` }}>
+                <div style={{ fontSize: 48, opacity: 0.15 }}>★</div>
+                <div style={{ fontSize: 14, color: C.dim, textAlign: "center", lineHeight: 1.9 }}>
+                  학생을 선택하고<br /><b style={{ color: C.muted }}>AI 코칭 리포트 생성</b> 버튼을 누르세요<br />
+                  <span style={{ fontSize: 12 }}>학습 유형 · 강점 · 보완점 · 맞춤 솔루션<br />학부모 가이드까지 자동 생성됩니다</span>
+                </div>
+              </Card>
+            )}
+            {generating && (
+              <Card style={{ minHeight: 500, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 20 }}>
+                <div style={{ position: "relative", width: 60, height: 60 }}>
+                  <div className="spin" style={{ position: "absolute", inset: 0, border: `3px solid ${C.accent}`, borderTopColor: "transparent", borderRadius: "50%" }} />
+                  <div className="spin" style={{ position: "absolute", inset: 10, border: `2px solid #A78BFA`, borderBottomColor: "transparent", borderRadius: "50%", animationDirection: "reverse" }} />
+                </div>
+                <div style={{ fontSize: 14, color: C.muted, textAlign: "center", lineHeight: 1.8 }}>AI가 학습 데이터를 분석하고 있습니다...<br /><span style={{ fontSize: 12, color: C.dim }}>맞춤 코칭 리포트를 작성 중입니다</span></div>
+              </Card>
+            )}
+
+            {report && !generating && (
+              <div className="fade">
+                {/* 리포트 헤더 */}
+                <div style={{ background: "linear-gradient(135deg,#3B7EF6,#A78BFA)", borderRadius: 14, padding: "22px 26px", marginBottom: 16, color: "#fff" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                    <div>
+                      <div style={{ fontSize: 11, opacity: 0.8, marginBottom: 6, letterSpacing: "0.05em" }}>AI 학습 성향 코칭 리포트 · AI Coach System</div>
+                      <div style={{ fontSize: 22, fontWeight: 900, fontFamily: "'Space Grotesk',sans-serif" }}>{report.studentName} 학생</div>
+                      <div style={{ fontSize: 12, opacity: 0.85, marginTop: 4 }}>{report.class} · {report.date} · 평균 {report.score}점</div>
+                    </div>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button onClick={copy} style={{ padding: "6px 14px", borderRadius: 8, background: "rgba(255,255,255,0.2)", color: "#fff", fontSize: 12, fontWeight: 600, border: "none", cursor: "pointer" }}>{copied ? "✓ 복사됨" : "복사"}</button>
+                      <button onClick={save} style={{ padding: "6px 14px", borderRadius: 8, background: "rgba(255,255,255,0.2)", color: "#fff", fontSize: 12, fontWeight: 600, border: "none", cursor: "pointer" }}>저장</button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 5열 그리드 */}
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 12, marginBottom: 14 }}>
+                  {/* 학습 성향 프로파일 */}
+                  <Card style={{ gridColumn: "span 1", padding: 16 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: C.accent, marginBottom: 12, padding: "3px 8px", background: C.accentSoft, borderRadius: 4, display: "inline-block" }}>학습 성향 프로파일</div>
+                    <DonutChart data={report.studyProfile?.distribution} />
+                    <div style={{ marginTop: 12, fontSize: 12, fontWeight: 700, color: C.text }}>{report.studyProfile?.type}</div>
+                    <div style={{ fontSize: 11, color: C.muted, marginTop: 4, lineHeight: 1.6 }}>{report.studyProfile?.description}</div>
+                  </Card>
+
+                  {/* 강점 및 보완점 */}
+                  <Card style={{ padding: 16 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: C.green, marginBottom: 12, padding: "3px 8px", background: C.greenSoft, borderRadius: 4, display: "inline-block" }}>강점 및 보완점</div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: C.green, marginBottom: 6 }}>학습 강점</div>
+                    {report.strengths?.map((s, i) => (
+                      <div key={i} style={{ fontSize: 11, color: C.muted, marginBottom: 5, display: "flex", gap: 6 }}>
+                        <span style={{ color: C.green, flexShrink: 0 }}>•</span>{s}
+                      </div>
+                    ))}
+                    <div style={{ fontSize: 11, fontWeight: 700, color: C.yellow, margin: "12px 0 6px" }}>보완점</div>
+                    {report.weaknesses?.map((w, i) => (
+                      <div key={i} style={{ fontSize: 11, color: C.muted, marginBottom: 5, display: "flex", gap: 6 }}>
+                        <span style={{ color: C.yellow, flexShrink: 0 }}>•</span>{w}
+                      </div>
+                    ))}
+                  </Card>
+
+                  {/* 전문가 종합 분석 */}
+                  <Card style={{ padding: 16 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: "#A78BFA", marginBottom: 12, padding: "3px 8px", background: "#F3F0FF", borderRadius: 4, display: "inline-block" }}>전문가 종합 분석</div>
+                    <div style={{ fontSize: 11, color: C.muted, lineHeight: 1.8 }}>{report.expertAnalysis}</div>
+                    {report.riskFactors?.length > 0 && <>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: C.red, margin: "12px 0 6px" }}>⚠ 주의/위험 요소</div>
+                      {report.riskFactors.map((r, i) => (
+                        <div key={i} style={{ fontSize: 11, color: C.muted, marginBottom: 5, display: "flex", gap: 6 }}>
+                          <span style={{ color: C.red, flexShrink: 0 }}>•</span>{r}
+                        </div>
+                      ))}
+                    </>}
+                  </Card>
+
+                  {/* 맞춤 학습 솔루션 */}
+                  <Card style={{ padding: 16 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: C.yellow, marginBottom: 12, padding: "3px 8px", background: C.yellowSoft, borderRadius: 4, display: "inline-block" }}>맞춤 학습 솔루션</div>
+                    {[["복습방법", report.solutions?.reviewMethod, C.accent], ["암기방법", report.solutions?.memoryMethod, C.green], ["학습루틴", report.solutions?.studyRoutine, "#A78BFA"], ["집중력향상", report.solutions?.focusTips, C.red]].map(([title, items, color]) => (
+                      <div key={title} style={{ marginBottom: 10 }}>
+                        <div style={{ fontSize: 10, fontWeight: 700, color, marginBottom: 4 }}>{title}</div>
+                        {items?.map((item, i) => (
+                          <div key={i} style={{ fontSize: 10, color: C.muted, marginBottom: 3, display: "flex", gap: 5 }}>
+                            <span style={{ color, flexShrink: 0 }}>›</span>{item}
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                  </Card>
+
+                  {/* 학부모 코칭 가이드 */}
+                  <Card style={{ padding: 16 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: C.red, marginBottom: 12, padding: "3px 8px", background: C.redSoft, borderRadius: 4, display: "inline-block" }}>학부모 코칭 가이드</div>
+                    {report.parentGuide?.map((g, i) => (
+                      <div key={i} style={{ fontSize: 11, color: C.muted, marginBottom: 8, padding: "8px 10px", background: C.bg, borderRadius: 8, lineHeight: 1.6, borderLeft: `2px solid ${C.red}` }}>
+                        <span style={{ fontWeight: 700, color: C.red }}>①②③④⑤⑥⑦⑧⑨⑩"[i + 1]"</span>{g}
+                      </div>
+                    ))}
+                  </Card>
+                </div>
+
+                {/* 하단: 목표 + 교사 메시지 */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                  <Card style={{ padding: 16 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: C.accent, marginBottom: 12 }}>🎯 학습 목표</div>
+                    {report.nextGoals?.map((g, i) => (
+                      <div key={i} style={{ display: "flex", gap: 10, alignItems: "flex-start", marginBottom: 8 }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: "#fff", background: C.accent, borderRadius: "50%", width: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{i + 1}</span>
+                        <span style={{ fontSize: 12, color: C.muted, lineHeight: 1.6 }}>{g}</span>
+                      </div>
+                    ))}
+                  </Card>
+                  <Card style={{ padding: 16, borderLeft: `3px solid ${C.accent}` }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: C.accent, marginBottom: 10 }}>📝 담당 교사 코칭 방향</div>
+                    <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.8 }}>{report.teacherMessage}</div>
+                  </Card>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {tab === "history" && (
+        <div className="fade">
+          {saved.length === 0
+            ? <Card style={{ textAlign: "center", padding: "48px", color: C.dim }}>저장된 리포트가 없습니다</Card>
+            : saved.map(r => (
+              <Card key={r.id} style={{ marginBottom: 12, cursor: "pointer" }} onClick={() => { setReport(r); setTab("create"); }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div>
+                    <div style={{ fontSize: 15, fontWeight: 700 }}>{r.studentName} 학생 코칭 리포트</div>
+                    <div style={{ fontSize: 12, color: C.muted, marginTop: 3 }}>{r.class} · {r.date} · 평균 {r.score}점</div>
+                  </div>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    <Badge color={C.accent}>{r.studyProfile?.type}</Badge>
+                    <span style={{ fontSize: 11, color: C.dim }}>클릭하여 보기</span>
+                  </div>
+                </div>
+                <div style={{ fontSize: 12, color: C.muted, marginTop: 8, lineHeight: 1.6 }}>{r.expertAnalysis?.slice(0, 100)}...</div>
+              </Card>
+            ))
+          }
+        </div>
+      )}
+    </div>
+  );
 }
