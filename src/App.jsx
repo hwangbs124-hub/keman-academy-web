@@ -527,7 +527,7 @@ function StudentsPanel({ store }) {
             </tr>;
           })}
         </tbody>
-      </table>
+      </table></div>
       {filtered.length===0 && <div style={{ textAlign:"center", padding:"32px", color:C.dim }}>학생이 없습니다</div>}
     </Card>
 
@@ -755,7 +755,7 @@ function SchedulePanel({ store }) {
             </tr>
           ))}
         </tbody>
-      </table>
+      </table></div>
     </Card>
 
     {/* 수정 모달 */}
