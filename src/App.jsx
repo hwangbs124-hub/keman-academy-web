@@ -198,12 +198,49 @@ export default function App() {
         .fade{animation:fi 0.3s ease}@keyframes fi{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
         .spin{animation:sp 0.8s linear infinite}@keyframes sp{from{transform:rotate(0)}to{transform:rotate(360deg)}}
         ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:#E2E8F0;border-radius:2px}
-        .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.35);z-index:100;display:flex;align-items:center;justify-content:center}
-        .modal{background:#fff;border-radius:16px;padding:28px;width:480px;max-width:90vw;max-height:90vh;overflow-y:auto}
+        .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.35);z-index:100;display:flex;align-items:center;justify-content:center;padding:16px}
+        .modal{background:#fff;border-radius:16px;padding:24px;width:100%;max-width:480px;max-height:90vh;overflow-y:auto}
+
+        /* 모바일 하단 네비게이션 */
+        .mobile-nav{display:none}
+        .desktop-sidebar{display:flex}
+
+        /* 반응형 그리드 */
+        .grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+        .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+        .grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+        .grid-7{display:grid;grid-template-columns:repeat(7,1fr);gap:10px}
+        .grid-report{display:grid;grid-template-columns:1fr 1.4fr;gap:18px}
+        .grid-sms{display:grid;grid-template-columns:1fr 1.3fr;gap:18px}
+        .grid-coaching{display:grid;grid-template-columns:300px 1fr;gap:18px}
+        .grid-5col{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
+        .table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+
+        @media(max-width:768px){
+          .desktop-sidebar{display:none!important}
+          .mobile-nav{display:flex;position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid #E2E8F0;z-index:50;padding:4px 0;padding-bottom:env(safe-area-inset-bottom)}
+          .main-content{padding:16px 14px 80px!important}
+          .grid-4{grid-template-columns:repeat(2,1fr)!important;gap:10px!important}
+          .grid-2{grid-template-columns:1fr!important;gap:12px!important}
+          .grid-3{grid-template-columns:1fr!important;gap:10px!important}
+          .grid-7{grid-template-columns:repeat(4,1fr)!important;gap:8px!important}
+          .grid-report{grid-template-columns:1fr!important;gap:12px!important}
+          .grid-sms{grid-template-columns:1fr!important;gap:12px!important}
+          .grid-coaching{grid-template-columns:1fr!important;gap:12px!important}
+          .grid-5col{grid-template-columns:1fr 1fr!important;gap:8px!important}
+          .hide-mobile{display:none!important}
+          .page-header{font-size:18px!important}
+          .card-padding{padding:14px!important}
+        }
+        @media(max-width:480px){
+          .grid-4{grid-template-columns:repeat(2,1fr)!important}
+          .grid-7{grid-template-columns:repeat(3,1fr)!important}
+          .grid-5col{grid-template-columns:1fr!important}
+        }
       `}</style>
 
-      {/* Sidebar */}
-      <aside style={{ width:72, background:C.card, borderRight:`1px solid ${C.border}`, display:"flex", flexDirection:"column", alignItems:"center", padding:"18px 0", position:"sticky", top:0, height:"100vh", zIndex:10, boxShadow:"2px 0 8px rgba(0,0,0,0.04)" }}>
+      {/* 데스크탑 사이드바 */}
+      <aside className="desktop-sidebar" style={{ width:72, background:C.card, borderRight:`1px solid ${C.border}`, flexDirection:"column", alignItems:"center", padding:"18px 0", position:"sticky", top:0, height:"100vh", zIndex:10, boxShadow:"2px 0 8px rgba(0,0,0,0.04)" }}>
         <div style={{ width:36, height:36, background:C.accent, borderRadius:10, display:"flex", alignItems:"center", justifyContent:"center", fontSize:16, fontWeight:900, fontFamily:"'Space Grotesk',sans-serif", color:"#fff", marginBottom:4, boxShadow:`0 4px 12px rgba(59,126,246,0.3)` }}>K</div>
         <div style={{ fontSize:8, color:C.accent, fontWeight:700, marginBottom:20 }}>{settings.academyName.slice(0,3)}</div>
         <div style={{ display:"flex", flexDirection:"column", gap:4, width:"100%" }}>
@@ -226,7 +263,7 @@ export default function App() {
         </div>
       </aside>
 
-      <main style={{ flex:1, overflow:"auto", padding:"28px 32px" }}>
+      <main className="main-content" style={{ flex:1, overflow:"auto", padding:"28px 32px" }}>
         {nav==="dashboard" && <Dashboard store={store} setNav={setNav} />}
         {nav==="students"  && <StudentsPanel store={store} />}
         {nav==="classes"   && <ClassesPanel store={store} />}
@@ -237,6 +274,20 @@ export default function App() {
         {nav==="coaching"  && <CoachingPanel store={store} />}
         {nav==="settings"  && <SettingsPanel store={store} />}
       </main>
+
+      {/* 모바일 하단 네비게이션 */}
+      <nav className="mobile-nav">
+        {NAV.map(item => (
+          <button key={item.id} onClick={() => setNav(item.id)}
+            style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", gap:2, padding:"6px 2px", position:"relative", background:"none", border:"none" }}>
+            <span style={{ fontSize:18, color:nav===item.id?C.accent:C.dim }}>{item.icon}</span>
+            <span style={{ fontSize:8, color:nav===item.id?C.accent:C.dim, letterSpacing:"0.01em" }}>{item.label}</span>
+            {item.id==="notice"&&unread>0&&(
+              <span style={{ position:"absolute", top:3, left:"50%", marginLeft:4, width:12, height:12, background:C.red, borderRadius:"50%", fontSize:7, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:700, color:"#fff" }}>{unread}</span>
+            )}
+          </button>
+        ))}
+      </nav>
     </div>
   );
 }
@@ -296,7 +347,7 @@ function Dashboard({ store, setNav }) {
   const today = new Date().toLocaleDateString("ko-KR",{year:"numeric",month:"long",day:"numeric",weekday:"long"});
   return <div className="fade">
     <Hdr title="대시보드" sub={today} />
-    <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:14, marginBottom:24 }}>
+    <div className="grid-4" style={{ marginBottom:24 }}>
       {[
         { label:"전체 학생", value:students.length+"명", color:C.accent, icon:"◎", nav:"students" },
         { label:"진행 수업", value:classes.length+"개 반", color:C.green, icon:"◫", nav:"classes" },
@@ -316,7 +367,7 @@ function Dashboard({ store, setNav }) {
         </div>
       ))}
     </div>
-    <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:18 }}>
+    <div className="grid-2">
       <Card>
         <div style={{ fontSize:14, fontWeight:700, marginBottom:14 }}>반 현황</div>
         <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
@@ -444,7 +495,7 @@ function StudentsPanel({ store }) {
       </div>
     </Card>
     <Card>
-      <table style={{ width:"100%", borderCollapse:"collapse" }}>
+      <div className="table-scroll"><table style={{ width:"100%", borderCollapse:"collapse", minWidth:480 }}>
         <thead><tr style={{ borderBottom:`1px solid ${C.border}` }}>
           {["이름","수강반","학부모 연락처","평균 점수","과제","추세",""].map(h=>(
             <th key={h} style={{ textAlign:"left", padding:"8px 12px", fontSize:11, color:C.muted, fontWeight:500 }}>{h}</th>
@@ -511,7 +562,7 @@ function StudentsPanel({ store }) {
       {xlsxPreview.length > 0 && <>
         <div style={{ fontSize:13, fontWeight:700, marginBottom:10, color:C.green }}>✓ {xlsxPreview.length}명 인식됨 — 미리보기</div>
         <div style={{ maxHeight:240, overflowY:"auto", border:`1px solid ${C.border}`, borderRadius:10, marginBottom:14 }}>
-          <table style={{ width:"100%", borderCollapse:"collapse" }}>
+          <div className="table-scroll"><table style={{ width:"100%", borderCollapse:"collapse", minWidth:480 }}>
             <thead><tr style={{ background:C.bg, borderBottom:`1px solid ${C.border}` }}>
               {["이름","반","연락처","점수","과제","추세"].map(h=><th key={h} style={{ padding:"7px 10px", fontSize:11, color:C.muted, textAlign:"left", fontWeight:500 }}>{h}</th>)}
             </tr></thead>
@@ -593,7 +644,7 @@ function ClassesPanel({ store }) {
     <div style={{ display:"flex", justifyContent:"flex-end", marginBottom:14 }}>
       <Btn onClick={()=>open(null)}>+ 수업 추가</Btn>
     </div>
-    <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:14 }}>
+    <div className="grid-3">
       {classes.map((c,i) => {
         const cnt = students.filter(s=>s.classId===c.id).length;
         return <Card key={c.id} style={{ borderLeft:`3px solid ${COLORS_LIST[i%COLORS_LIST.length]}` }}>
@@ -652,7 +703,7 @@ function SchedulePanel({ store }) {
 
   return <div className="fade">
     <Hdr title="주간 시간표" sub="수업 카드를 클릭하면 수정할 수 있어요" />
-    <div style={{ display:"grid", gridTemplateColumns:"repeat(7,1fr)", gap:10 }}>
+    <div className="grid-7">
       {DAYS.map((day, di) => {
         const dayClasses = classes.filter(c => c.days?.includes(day));
         return <Card key={day} style={{ minHeight:240, padding:14 }}>
@@ -680,7 +731,7 @@ function SchedulePanel({ store }) {
     {/* 전체 목록 */}
     <Card style={{ marginTop:16 }}>
       <div style={{ fontSize:14, fontWeight:700, marginBottom:14 }}>전체 수업 목록</div>
-      <table style={{ width:"100%", borderCollapse:"collapse" }}>
+      <div className="table-scroll"><table style={{ width:"100%", borderCollapse:"collapse", minWidth:480 }}>
         <thead><tr style={{ borderBottom:`1px solid ${C.border}` }}>
           {["반 이름","담당 선생님","수업 시간","강의실","요일",""].map(h=>(
             <th key={h} style={{ textAlign:"left", padding:"8px 12px", fontSize:11, color:C.muted, fontWeight:500 }}>{h}</th>
@@ -897,7 +948,7 @@ function SMSPanel({ store }) {
       ))}
     </div>
 
-    <div style={{ display:"grid", gridTemplateColumns:"1fr 1.3fr", gap:18 }}>
+    <div className="grid-sms">
       <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
         <Card>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12 }}>
@@ -1048,7 +1099,7 @@ function ReportPanel({ store }) {
       ))}
     </div>
 
-    {tab==="create" && <div style={{ display:"grid", gridTemplateColumns:"1fr 1.4fr", gap:18 }}>
+    {tab==="create" && <div className="grid-report">
       <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
         <Card>
           <div style={{ fontSize:14, fontWeight:700, marginBottom:16 }}>수업 정보</div>
@@ -1262,7 +1313,7 @@ function ReportResult({ report, setReport, onSave, onCopy, copied, student }) {
 
   return <div className="fade">
     <Hdr title="설정" sub="학원 정보 및 환경 설정" />
-    <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:18 }}>
+    <div className="grid-2">
       <Card>
         <div style={{ fontSize:14, fontWeight:700, marginBottom:16 }}>학원 기본 정보</div>
         <Input label="학원 이름" value={form.academyName||""} onChange={v=>setForm(p=>({...p,academyName:v}))} placeholder="키맨학원" />
@@ -1402,7 +1453,7 @@ ${report.teacherMessage}`;
       </div>
 
       {tab === "create" && (
-        <div style={{ display: "grid", gridTemplateColumns: "300px 1fr", gap: 18 }}>
+        <div className="grid-coaching">
           {/* 입력 폼 */}
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             <Card>
@@ -1521,7 +1572,7 @@ ${report.teacherMessage}`;
                 </div>
 
                 {/* 5열 그리드 */}
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 12, marginBottom: 14 }}>
+                <div className="grid-5col" style={{ marginBottom:14 }}>
                   {/* 학습 성향 프로파일 */}
                   <Card style={{ gridColumn: "span 1", padding: 16 }}>
                     <div style={{ fontSize: 11, fontWeight: 700, color: C.accent, marginBottom: 12, padding: "3px 8px", background: C.accentSoft, borderRadius: 4, display: "inline-block" }}>학습 성향 프로파일</div>
@@ -1588,7 +1639,7 @@ ${report.teacherMessage}`;
                 </div>
 
                 {/* 하단: 목표 + 교사 메시지 */}
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+                <div className="grid-2" style={{ marginBottom:12 }}>
                   <Card style={{ padding: 16 }}>
                     <div style={{ fontSize: 11, fontWeight: 700, color: C.accent, marginBottom: 12 }}>🎯 학습 목표</div>
                     {report.nextGoals?.map((g, i) => (
