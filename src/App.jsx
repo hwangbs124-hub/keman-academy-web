@@ -170,6 +170,7 @@ const NAV = [
   { id:"grades",    icon:"◈", label:"성적/과제" },
   { id:"notice",    icon:"◉", label:"공지/메시지" },
   { id:"sms",       icon:"✉", label:"문자 발송" },
+  { id:"consult",   icon:"💬", label:"상담 문자" },
   { id:"coaching",  icon:"★", label:"코칭 리포트" },
   { id:"settings",  icon:"⚙", label:"설정" },
 ];
@@ -271,6 +272,7 @@ export default function App() {
         {nav==="grades"    && <GradesPanel store={store} />}
         {nav==="notice"    && <NoticePanel store={store} />}
         {nav==="sms"       && <SMSPanel store={store} />}
+        {nav==="consult"   && <ConsultPanel store={store} />}
         {nav==="coaching"  && <CoachingPanel store={store} />}
         {nav==="settings"  && <SettingsPanel store={store} />}
       </main>
@@ -1745,6 +1747,339 @@ function CoachingEditSection({ report, setReport, student }) {
           </div>
         </Card>
       )}
+    </div>
+  );
+}
+
+// ── 상담 문자 자동완성 ──
+const CONSULT_TYPES = [
+  { id:"new_inquiry",   icon:"🌱", label:"초기 문의 응대",    desc:"처음 문의하신 학부모님께 보내는 첫 인상 문자" },
+  { id:"new_consult",   icon:"📋", label:"초기 상담 안내",    desc:"상담 예약 후 상담 전 안내 문자" },
+  { id:"after_consult", icon:"✅", label:"상담 후 감사 문자", desc:"상담 완료 후 입학 권유 및 감사 인사" },
+  { id:"progress",      icon:"📈", label:"학습 진도 보고",    desc:"기존 학생 학습 진행 상황 공유" },
+  { id:"concern",       icon:"💛", label:"학습 우려 상담",    desc:"성적 하락 또는 집중도 저하 시 공감 문자" },
+  { id:"absent",        icon:"📞", label:"결석 확인 문자",    desc:"결석 시 걱정과 안부를 담은 문자" },
+  { id:"event",         icon:"🎉", label:"특강/이벤트 안내",  desc:"특강, 모의고사, 이벤트 안내 문자" },
+  { id:"renewal",       icon:"🔄", label:"재등록 권유",       desc:"수강 종료 전 재등록 안내 문자" },
+];
+
+const CONSULT_TONE = [
+  { id:"warm",       label:"🤝 따뜻하고 공감적" },
+  { id:"pro",        label:"💼 전문적이고 신뢰감 있는" },
+  { id:"friendly",   label:"😊 친근하고 편안한" },
+  { id:"concise",    label:"⚡ 간결하고 핵심적인" },
+];
+
+function generateConsultMsg({ type, tone, studentName, className, teacherName, academyName, extraNote }) {
+  const acad = academyName || "키맨학원";
+  const s = studentName || "자녀";
+  const cls = className || "";
+  const t = teacherName || "선생님";
+
+  const toneDesc = {
+    warm:     "따뜻하고 공감적인",
+    pro:      "전문적이고 신뢰감 있는",
+    friendly: "친근하고 편안한",
+    concise:  "간결하고 핵심적인",
+  }[tone] || "따뜻한";
+
+  const templates = {
+    new_inquiry: [
+      `안녕하세요, ${acad}입니다 😊\n${s} 학생 관련하여 문의해 주셔서 감사합니다!\n저희 ${acad}은 ${cls ? cls + " 과정을 포함해 " : ""}학생 개인에 맞춘 맞춤형 교육을 제공하고 있습니다.\n\n궁금하신 점은 언제든지 편하게 연락 주세요.\n빠르고 친절하게 안내해 드리겠습니다 🙏\n${extraNote ? "\n" + extraNote : ""}`,
+      `안녕하세요! ${acad} 입니다.\n${s} 학생의 학습에 관심 가져주셔서 감사합니다 🌱\n\n저희는 학생 한 명 한 명의 성장에 진심으로 집중합니다.\n${cls ? cls + " 과정에 대해 " : ""}더 자세한 안내를 드리고 싶습니다.\n\n편하신 시간에 상담 예약 부탁드립니다! 📞`,
+    ],
+    new_consult: [
+      `안녕하세요, ${acad} ${t}입니다 😊\n${s} 학생 상담 예약 확인해 드립니다!\n\n📅 상담 시 준비해 오시면 좋은 것들:\n• 현재 학습 고민이나 목표\n• 학교 성적표 또는 최근 시험지 (선택)\n• 궁금하신 점 미리 메모\n\n편안한 분위기에서 솔직하게 이야기 나눠요 🙏\n오시는 길 안내가 필요하시면 말씀해 주세요!`,
+      `${acad}입니다. 상담 예약해 주셔서 감사합니다!\n\n${s} 학생을 위한 최선의 학습 방향을 함께 찾아드리겠습니다.\n상담 시 편하게 어떤 고민이든 말씀해 주세요 📋\n\n궁금하신 점이 있으시면 언제든 연락 주세요!`,
+    ],
+    after_consult: [
+      `안녕하세요! ${acad} ${t}입니다 😊\n오늘 귀한 시간 내어 상담해 주셔서 진심으로 감사드립니다!\n\n${s} 학생의 가능성을 함께 발견할 수 있어서 정말 뜻깊었습니다 ✨\n저희 ${acad}에서 ${s} 학생이 목표를 이룰 수 있도록 최선을 다해 지도하겠습니다.\n\n추가로 궁금하신 점이 생기시면 편하게 연락 주세요!\n좋은 하루 보내세요 🙏${extraNote ? "\n\n" + extraNote : ""}`,
+      `${acad}입니다. 오늘 상담 감사드립니다! 🌟\n\n${s} 학생에 대해 더 잘 알게 되어 기쁩니다.\n말씀해 주신 내용 바탕으로 최적의 학습 계획을 준비하겠습니다.\n\n입학 관련 추가 문의는 언제든 연락 주세요 😊`,
+    ],
+    progress: [
+      `안녕하세요, ${acad} ${t}입니다 😊\n${s} 학생 최근 학습 현황 안내드립니다 📈\n\n수업 태도가 매우 성실하고, 꾸준히 발전하고 있습니다!\n${extraNote ? extraNote + "\n\n" : ""}앞으로도 지속적인 관심과 격려 부탁드립니다 🙏\n궁금하신 점은 언제든지 연락 주세요!`,
+      `${acad}입니다. ${s} 학생 학습 진도 공유드립니다 📊\n\n${cls ? "[" + cls + "] " : ""}수업에서 ${s} 학생이 꾸준히 좋은 모습을 보여주고 있습니다!\n${extraNote ? "\n" + extraNote + "\n" : ""}\n가정에서도 응원 부탁드립니다 💪`,
+    ],
+    concern: [
+      `안녕하세요, ${acad} ${t}입니다.\n다름이 아니라 ${s} 학생 학습 관련해 말씀드리고 싶어 연락드렸습니다 💛\n\n요즘 ${s} 학생이 평소보다 조금 힘들어 보여서 걱정이 됩니다.\n${extraNote ? extraNote + "\n\n" : ""}학교나 개인적인 어려움이 있는지 파악해보고 싶습니다.\n\n편하신 시간에 짧게라도 통화 가능하실까요? 함께 해결책을 찾아보겠습니다 🙏`,
+      `${acad}입니다. ${s} 학생 관련해 안내 드립니다.\n\n최근 수업 집중도와 성적에 변화가 있어 말씀드립니다 💛\n${extraNote ? extraNote + "\n" : ""}저희도 최선을 다해 지원하겠습니다.\n함께 이야기 나눠보면 좋을 것 같습니다. 연락 주세요!`,
+    ],
+    absent: [
+      `안녕하세요, ${acad} ${t}입니다 😊\n오늘 ${s} 학생이 수업에 참석하지 못해서 연락드렸습니다.\n\n혹시 몸이 불편하거나 어려운 일이 있는 건 아닌지 걱정이 됩니다 📞\n괜찮으시다면 간단히 알려주시면 감사하겠습니다.\n\n결석한 수업 내용은 다음 시간에 보충해 드리겠습니다!\n${s} 학생 잘 부탁드립니다 🙏`,
+      `${acad}입니다. 오늘 ${s} 학생 수업 결석 확인 연락드립니다.\n\n별 일 없으신지요? 건강하게 잘 지내고 있길 바랍니다 💛\n사정이 있으시면 편하게 알려주세요.\n결석분은 꼭 보충 도와드리겠습니다!`,
+    ],
+    event: [
+      `안녕하세요, ${acad}입니다 🎉\n${s} 학부모님께 특별한 소식을 전해드립니다!\n\n${extraNote ? extraNote + "\n\n" : "📌 곧 특강/이벤트가 진행될 예정입니다!\n\n"}관심 있으시면 빠르게 신청 부탁드립니다.\n자리가 한정되어 있어 서두르시는 게 좋을 것 같습니다 😊\n\n자세한 내용은 언제든지 문의 주세요!`,
+      `${acad}에서 안내드립니다 🌟\n\n${s} 학부모님, 좋은 기회를 놓치지 마세요!\n${extraNote ? extraNote + "\n" : ""}\n빠른 신청으로 혜택 받아가세요 🎊\n문의: 언제든 환영합니다!`,
+    ],
+    renewal: [
+      `안녕하세요, ${acad} ${t}입니다 😊\n${s} 학생과 함께한 시간이 참 뜻깊었습니다!\n\n곧 수강 기간이 종료될 예정이라 안내드립니다 🔄\n${s} 학생이 꾸준히 성장하고 있어, 계속 함께하면 더 좋은 결과가 있을 것 같습니다.\n\n재등록 관련 문의는 편하게 연락 주세요!\n항상 응원합니다 🙏${extraNote ? "\n\n" + extraNote : ""}`,
+      `${acad}입니다. ${s} 학생 수강 종료 안내드립니다.\n\n${s} 학생과 함께한 시간 정말 감사했습니다 🌟\n재등록 시 특별 혜택도 있으니 관심 가져주세요!\n언제든 연락 주세요 😊`,
+    ],
+  };
+
+  const msgs = templates[type] || templates["new_inquiry"];
+  // 톤에 따라 선택 (warm/friendly → 0번, pro/concise → 1번)
+  const idx = (tone === "pro" || tone === "concise") ? 1 : 0;
+  return msgs[Math.min(idx, msgs.length - 1)];
+}
+
+function ConsultPanel({ store }) {
+  const { students, classes, settings } = store;
+  const [consultType, setConsultType] = useState("new_inquiry");
+  const [tone, setTone] = useState("warm");
+  const [mode, setMode] = useState("new"); // "new" | "existing"
+  const [selStudent, setSelStudent] = useState("");
+  const [parentName, setParentName] = useState("");
+  const [studentName, setStudentName] = useState("");
+  const [className, setClassName] = useState("");
+  const [extraNote, setExtraNote] = useState("");
+  const [generated, setGenerated] = useState("");
+  const [sending, setSending] = useState(false);
+  const [sendResult, setSendResult] = useState(null);
+  const [toPhone, setToPhone] = useState("");
+  const [copied, setCopied] = useState(false);
+  const [history, setHistory] = useStore("km_consult_history", []);
+
+  const selectedStudent = students.find(s => s.id === Number(selStudent));
+  const selectedClass = selectedStudent ? classes.find(c => c.id === selectedStudent.classId) : null;
+
+  const handleStudentSelect = (id) => {
+    setSelStudent(id);
+    const s = students.find(st => st.id === Number(id));
+    if (s) {
+      setStudentName(s.name);
+      const cls = classes.find(c => c.id === s.classId);
+      setClassName(cls?.name || "");
+      setToPhone(s.parentPhone || "");
+    }
+  };
+
+  const generate = () => {
+    const name = mode === "existing" ? (selectedStudent?.name || studentName) : studentName;
+    const cls = mode === "existing" ? (selectedClass?.name || className) : className;
+    const msg = generateConsultMsg({
+      type: consultType,
+      tone,
+      studentName: name,
+      className: cls,
+      teacherName: settings.directorName || "선생님",
+      academyName: settings.academyName || "키맨학원",
+      extraNote,
+    });
+    setGenerated(msg);
+    setSendResult(null);
+  };
+
+  const copy = () => {
+    navigator.clipboard.writeText(generated);
+    setCopied(true); setTimeout(() => setCopied(false), 2000);
+  };
+
+  const send = async () => {
+    const phone = mode === "existing" ? (selectedStudent?.parentPhone || toPhone) : toPhone;
+    if (!phone) return alert("연락처를 입력해주세요.");
+    if (!generated) return alert("먼저 문자를 생성해주세요.");
+    setSending(true); setSendResult(null);
+    const to = phone.replace(/-/g, "");
+    try {
+      const res = await sendSolapiSMS({ to, text: generated, type: "sms" });
+      const result = res.error ? { ok: false, msg: res.error } : { ok: true, msg: "발송 완료!" };
+      setSendResult(result);
+      if (result.ok) {
+        const name = mode === "existing" ? (selectedStudent?.name || studentName) : studentName;
+        setHistory(p => [{ id: Date.now(), type: consultType, tone, name, phone, text: generated, date: new Date().toLocaleDateString("ko-KR") }, ...p.slice(0, 49)]);
+      }
+    } catch (e) { setSendResult({ ok: false, msg: e.message }); }
+    setSending(false);
+  };
+
+  const typeInfo = CONSULT_TYPES.find(t => t.id === consultType);
+
+  return (
+    <div className="fade">
+      <Hdr title="상담 문자 자동완성" sub="일관되고 전문적인 학부모 상담 문자를 자동으로 생성합니다" />
+
+      <div className="grid-sms">
+        {/* 왼쪽: 설정 */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+
+          {/* 상담 유형 */}
+          <Card>
+            <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 14 }}>① 상담 유형 선택</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+              {CONSULT_TYPES.map(t => (
+                <button key={t.id} onClick={() => setConsultType(t.id)}
+                  style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 14px", borderRadius: 10, cursor: "pointer", textAlign: "left",
+                    border: `1.5px solid ${consultType === t.id ? C.accent : C.border}`,
+                    background: consultType === t.id ? C.accentSoft : "#fff" }}>
+                  <span style={{ fontSize: 20, flexShrink: 0 }}>{t.icon}</span>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: consultType === t.id ? C.accent : C.text }}>{t.label}</div>
+                    <div style={{ fontSize: 11, color: C.dim, marginTop: 2 }}>{t.desc}</div>
+                  </div>
+                  {consultType === t.id && <span style={{ marginLeft: "auto", color: C.accent, fontSize: 16, flexShrink: 0 }}>✓</span>}
+                </button>
+              ))}
+            </div>
+          </Card>
+
+          {/* 톤 선택 */}
+          <Card>
+            <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>② 문자 톤 선택</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+              {CONSULT_TONE.map(t => (
+                <button key={t.id} onClick={() => setTone(t.id)}
+                  style={{ padding: "10px 12px", borderRadius: 9, cursor: "pointer", fontSize: 12, fontWeight: 600,
+                    border: `1.5px solid ${tone === t.id ? C.accent : C.border}`,
+                    background: tone === t.id ? C.accentSoft : "#fff",
+                    color: tone === t.id ? C.accent : C.text }}>
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          </Card>
+        </div>
+
+        {/* 오른쪽: 학생 정보 + 미리보기 */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+
+          {/* 대상 선택 */}
+          <Card>
+            <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 14 }}>③ 대상 정보 입력</div>
+
+            {/* 신규/기존 토글 */}
+            <div style={{ display: "flex", gap: 4, marginBottom: 14, background: C.bg, borderRadius: 9, padding: 4 }}>
+              {[{ id: "new", label: "🌱 신규 문의" }, { id: "existing", label: "👤 기존 학생" }].map(m => (
+                <button key={m.id} onClick={() => { setMode(m.id); setSelStudent(""); setStudentName(""); setClassName(""); setToPhone(""); }}
+                  style={{ flex: 1, padding: "8px", borderRadius: 7, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer",
+                    background: mode === m.id ? C.accent : "transparent",
+                    color: mode === m.id ? "#fff" : C.muted }}>
+                  {m.label}
+                </button>
+              ))}
+            </div>
+
+            {mode === "existing" ? (
+              <div className="fade">
+                <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 14 }}>
+                  {students.length === 0
+                    ? <div style={{ fontSize: 12, color: C.dim, textAlign: "center", padding: "16px" }}>등록된 학생이 없습니다</div>
+                    : students.map(s => {
+                        const cls = classes.find(c => c.id === s.classId);
+                        return (
+                          <button key={s.id} onClick={() => handleStudentSelect(String(s.id))}
+                            style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 8, cursor: "pointer", textAlign: "left",
+                              border: `1.5px solid ${selStudent === String(s.id) ? C.accent : C.border}`,
+                              background: selStudent === String(s.id) ? C.accentSoft : "#fff" }}>
+                            <div style={{ width: 30, height: 30, borderRadius: "50%", background: selStudent === String(s.id) ? C.accent : C.border, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, color: selStudent === String(s.id) ? "#fff" : C.muted, flexShrink: 0 }}>
+                              {s.name[0]}
+                            </div>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontSize: 13, fontWeight: 600, color: selStudent === String(s.id) ? C.accent : C.text }}>{s.name}</div>
+                              <div style={{ fontSize: 11, color: C.dim }}>{cls?.name || "반 없음"} · {s.parentPhone || "연락처 없음"}</div>
+                            </div>
+                            {selStudent === String(s.id) && <span style={{ color: C.accent }}>✓</span>}
+                          </button>
+                        );
+                      })}
+                </div>
+              </div>
+            ) : (
+              <div className="fade">
+                <Input label="학생 이름" value={studentName} onChange={setStudentName} placeholder="예: 홍길동" />
+                <Input label="수강 과목/반 (선택)" value={className} onChange={setClassName} placeholder="예: 수학 심화반" />
+                <Input label="학부모 연락처" value={toPhone} onChange={setToPhone} placeholder="010-0000-0000" />
+              </div>
+            )}
+
+            {mode === "existing" && selStudent && (
+              <Input label="발송 번호 확인" value={toPhone} onChange={setToPhone} placeholder="010-0000-0000" />
+            )}
+
+            <div>
+              <label style={{ fontSize: 11, color: C.muted, display: "block", marginBottom: 5, fontWeight: 500 }}>추가 메모 (선택)</label>
+              <textarea value={extraNote} onChange={e => setExtraNote(e.target.value)} rows={2}
+                placeholder="예: 이번 달 성적이 올랐어요 / 특강 일정: 6월 10일 / 재등록 10% 할인 중"
+                style={{ width: "100%", border: `1px solid ${C.border}`, borderRadius: 8, padding: "9px 12px", fontSize: 13, resize: "vertical" }} />
+            </div>
+
+            <button className="bt" onClick={generate}
+              style={{ width: "100%", marginTop: 14, padding: "13px", borderRadius: 10, fontSize: 14, fontWeight: 700, border: "none", cursor: "pointer",
+                background: "linear-gradient(135deg,#3B7EF6,#6366F1)", color: "#fff",
+                boxShadow: "0 4px 16px rgba(59,126,246,0.3)", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+              💬 상담 문자 자동 생성
+            </button>
+          </Card>
+
+          {/* 생성된 문자 미리보기 */}
+          {generated && (
+            <Card className="fade" style={{ border: `1px solid ${C.accent}30` }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 700 }}>{typeInfo?.icon} {typeInfo?.label}</div>
+                  <div style={{ fontSize: 11, color: C.dim, marginTop: 2 }}>
+                    {CONSULT_TONE.find(t => t.id === tone)?.label}
+                  </div>
+                </div>
+                <button onClick={copy} style={{ fontSize: 12, padding: "5px 12px", borderRadius: 7, border: `1px solid ${C.border}`, background: copied ? C.greenSoft : "#fff", color: copied ? C.green : C.muted, cursor: "pointer", fontWeight: 600 }}>
+                  {copied ? "✓ 복사됨" : "복사"}
+                </button>
+              </div>
+
+              {/* 문자 내용 - 편집 가능 */}
+              <textarea value={generated} onChange={e => setGenerated(e.target.value)} rows={10}
+                style={{ width: "100%", border: `1px solid ${C.border}`, borderRadius: 10, padding: "14px", fontSize: 13, lineHeight: 1.8, resize: "vertical", background: C.bg, color: C.text }} />
+
+              <div style={{ fontSize: 11, color: C.dim, marginTop: 6, marginBottom: 14 }}>
+                💡 내용을 직접 수정할 수 있어요 · {generated.length}자
+              </div>
+
+              {/* 발송 */}
+              <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                <input value={toPhone} onChange={e => setToPhone(e.target.value)} placeholder="010-0000-0000"
+                  style={{ flex: 1, border: `1px solid ${C.border}`, borderRadius: 8, padding: "9px 12px", fontSize: 13 }} />
+                <button className="bt" onClick={send} disabled={sending}
+                  style={{ padding: "9px 20px", borderRadius: 8, fontSize: 13, fontWeight: 700, border: "none", cursor: "pointer", flexShrink: 0,
+                    background: sending ? C.border : C.accent, color: sending ? C.muted : "#fff" }}>
+                  {sending ? <><span className="spin" style={{ display: "inline-block", marginRight: 4 }}>⟳</span>발송 중</> : "✉ SMS 발송"}
+                </button>
+              </div>
+
+              {sendResult && (
+                <div style={{ marginTop: 10, padding: "10px 14px", borderRadius: 8, background: sendResult.ok ? C.greenSoft : C.redSoft, fontSize: 12, color: sendResult.ok ? C.green : C.red, fontWeight: 600 }}>
+                  {sendResult.ok ? "✓ " : "✗ "}{sendResult.msg}
+                </div>
+              )}
+            </Card>
+          )}
+
+          {/* 발송 이력 */}
+          {history.length > 0 && (
+            <Card>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                <div style={{ fontSize: 14, fontWeight: 700 }}>최근 발송 이력</div>
+                <button onClick={() => setHistory([])} style={{ fontSize: 11, color: C.dim, background: "none", border: "none", cursor: "pointer" }}>전체 삭제</button>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 280, overflowY: "auto" }}>
+                {history.slice(0, 10).map(h => {
+                  const t = CONSULT_TYPES.find(ct => ct.id === h.type);
+                  return (
+                    <div key={h.id} style={{ padding: "10px 12px", borderRadius: 8, background: C.bg, cursor: "pointer" }}
+                      onClick={() => setGenerated(h.text)}>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                        <span style={{ fontSize: 12, fontWeight: 600 }}>{t?.icon} {h.name || "신규"} · {t?.label}</span>
+                        <span style={{ fontSize: 11, color: C.dim }}>{h.date}</span>
+                      </div>
+                      <div style={{ fontSize: 11, color: C.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{h.text}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
