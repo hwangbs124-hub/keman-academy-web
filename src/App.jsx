@@ -494,33 +494,30 @@ function StudentsPanel({ store }) {
         <Btn onClick={()=>open(null)}>+ 학생 추가</Btn>
       </div>
     </Card>
-    <Card>
-      <div className="table-scroll"><table style={{ width:"100%", borderCollapse:"collapse", minWidth:480 }}>
-        <thead><tr style={{ borderBottom:`1px solid ${C.border}` }}>
-          {["이름","수강반","학부모 연락처","과제",""].map(h=>(
-            <th key={h} style={{ textAlign:"left", padding:"8px 12px", fontSize:11, color:C.muted, fontWeight:500 }}>{h}</th>
-          ))}
-        </tr></thead>
-        <tbody>
-          {filtered.map(s => {
-            const cls = classes.find(c=>c.id===s.classId);
-            return <tr key={s.id} className="rh" style={{ borderBottom:`1px solid ${C.border}22` }}>
-              <td style={{ padding:"12px", fontWeight:600, fontSize:13 }}>{s.name}</td>
-              <td style={{ padding:"12px", fontSize:12, color:C.muted }}>{cls?.name||"미지정"}</td>
-              <td style={{ padding:"12px", fontSize:12, color:C.muted }}>{s.parentPhone||"-"}</td>
-              <td style={{ padding:"12px" }}><Badge color={s.homework==="완료"?C.green:C.red}>{s.homework}</Badge></td>
-              <td style={{ padding:"12px" }}>
-                <div style={{ display:"flex", gap:6 }}>
-                  <Btn small outline onClick={()=>open(s)}>수정</Btn>
-                  <Btn small outline color={C.red} onClick={()=>del(s.id)}>삭제</Btn>
+    <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+      {filtered.map(s => {
+        const cls = classes.find(c=>c.id===s.classId);
+        return (
+          <Card key={s.id} style={{ padding:"14px 16px" }}>
+            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+              <div style={{ flex:1, minWidth:0 }}>
+                <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:4 }}>
+                  <div style={{ fontSize:14, fontWeight:700 }}>{s.name}</div>
+                  <Badge color={s.homework==="완료"?C.green:C.red}>{s.homework}</Badge>
                 </div>
-              </td>
-            </tr>;
-          })}
-        </tbody>
-      </table></div>
-      {filtered.length===0 && <div style={{ textAlign:"center", padding:"32px", color:C.dim }}>학생이 없습니다</div>}
-    </Card>
+                <div style={{ fontSize:11, color:C.muted }}>{cls?.name||"미지정"}</div>
+                <div style={{ fontSize:11, color:C.dim, marginTop:2 }}>{s.parentPhone||"연락처 없음"}</div>
+              </div>
+              <div style={{ display:"flex", gap:6, flexShrink:0 }}>
+                <Btn small outline onClick={()=>open(s)}>수정</Btn>
+                <Btn small outline color={C.red} onClick={()=>del(s.id)}>삭제</Btn>
+              </div>
+            </div>
+          </Card>
+        );
+      })}
+      {filtered.length===0 && <Card style={{ textAlign:"center", padding:"32px", color:C.dim }}>학생이 없습니다</Card>}
+    </div>
 
     {/* 엑셀 업로드 모달 */}
     {xlsxModal && <Modal title="📤 엑셀/CSV 업로드" onClose={()=>setXlsxModal(false)}>
@@ -716,35 +713,28 @@ function SchedulePanel({ store }) {
       })}
     </div>
 
-    {/* 전체 목록 */}
-    <Card style={{ marginTop:16 }}>
-      <div style={{ fontSize:14, fontWeight:700, marginBottom:14 }}>전체 수업 목록</div>
-      <div className="table-scroll"><table style={{ width:"100%", borderCollapse:"collapse", minWidth:480 }}>
-        <thead><tr style={{ borderBottom:`1px solid ${C.border}` }}>
-          {["반 이름","담당 선생님","수업 시간","강의실","요일",""].map(h=>(
-            <th key={h} style={{ textAlign:"left", padding:"8px 12px", fontSize:11, color:C.muted, fontWeight:500 }}>{h}</th>
-          ))}
-        </tr></thead>
-        <tbody>
-          {classes.map((c, i) => (
-            <tr key={c.id} className="rh" style={{ borderBottom:`1px solid ${C.border}22` }}>
-              <td style={{ padding:"11px 12px", fontWeight:600, fontSize:13, color:COLORS_LIST[i%COLORS_LIST.length] }}>{c.name}</td>
-              <td style={{ padding:"11px 12px", fontSize:12, color:C.muted }}>{c.teacher}</td>
-              <td style={{ padding:"11px 12px", fontSize:12, color:C.muted }}>{c.time}</td>
-              <td style={{ padding:"11px 12px", fontSize:12, color:C.muted }}>{c.room}</td>
-              <td style={{ padding:"11px 12px" }}>
-                <div style={{ display:"flex", gap:4, flexWrap:"wrap" }}>
-                  {(c.days||[]).map(d => <span key={d} style={{ fontSize:10, padding:"2px 6px", borderRadius:4, background:COLORS_LIST[i%COLORS_LIST.length]+"18", color:COLORS_LIST[i%COLORS_LIST.length], fontWeight:700 }}>{d}</span>)}
-                </div>
-              </td>
-              <td style={{ padding:"11px 12px" }}>
-                <Btn small outline onClick={() => open(c)}>수정</Btn>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table></div>
-    </Card>
+    {/* 전체 목록 - 카드형 */}
+    <div style={{ marginTop:16, display:"flex", flexDirection:"column", gap:8 }}>
+      <div style={{ fontSize:14, fontWeight:700, marginBottom:4 }}>전체 수업 목록</div>
+      {classes.map((c, i) => (
+        <Card key={c.id} style={{ padding:"14px 16px" }}>
+          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+            <div style={{ flex:1, minWidth:0 }}>
+              <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:5, flexWrap:"wrap" }}>
+                <div style={{ fontSize:14, fontWeight:700, color:COLORS_LIST[i%COLORS_LIST.length] }}>{c.name}</div>
+                {(c.days||[]).map(d => (
+                  <span key={d} style={{ fontSize:10, padding:"2px 6px", borderRadius:4, background:COLORS_LIST[i%COLORS_LIST.length]+"18", color:COLORS_LIST[i%COLORS_LIST.length], fontWeight:700 }}>{d}</span>
+                ))}
+              </div>
+              <div style={{ fontSize:12, color:C.muted }}>
+                {c.teacher} · {c.time} · {c.room}
+              </div>
+            </div>
+            <Btn small outline onClick={() => open(c)}>수정</Btn>
+          </div>
+        </Card>
+      ))}
+    </div>
 
     {/* 수정 모달 */}
     {modal && <Modal title={`"${form.name}" 수정`} onClose={() => setModal(null)}>
@@ -783,50 +773,50 @@ function GradesPanel({ store }) {
     <Card style={{ marginBottom:14 }}>
       <div style={{ display:"flex", gap:10, alignItems:"center" }}>
         <select value={filterClass} onChange={e=>setFilterClass(e.target.value)}
-          style={{ border:`1px solid ${C.border}`, borderRadius:8, padding:"8px 12px", fontSize:13, color:C.text }}>
+          style={{ flex:1, border:`1px solid ${C.border}`, borderRadius:8, padding:"8px 12px", fontSize:13, color:C.text }}>
           <option value="all">전체 반</option>
           {classes.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
-        <span style={{ fontSize:12, color:C.muted }}>총 {filtered.length}명</span>
+        <span style={{ fontSize:12, color:C.muted, flexShrink:0 }}>총 {filtered.length}명</span>
       </div>
     </Card>
-    <Card>
-      <table style={{ width:"100%", borderCollapse:"collapse" }}>
-        <thead><tr style={{ borderBottom:`1px solid ${C.border}` }}>
-          {["이름","수강반","평균 점수","과제 상태","추세","비고"].map(h=>(
-            <th key={h} style={{ textAlign:"left", padding:"8px 12px", fontSize:11, color:C.muted, fontWeight:500 }}>{h}</th>
-          ))}
-        </tr></thead>
-        <tbody>
-          {filtered.map(s => {
-            const cls = classes.find(c=>c.id===s.classId);
-            return <tr key={s.id} className="rh" style={{ borderBottom:`1px solid ${C.border}22` }}>
-              <td style={{ padding:"11px 12px", fontWeight:600 }}>{s.name}</td>
-              <td style={{ padding:"11px 12px", fontSize:12, color:C.muted }}>{cls?.name||"-"}</td>
-              <td style={{ padding:"11px 12px" }}>
-                {editing===s.id+"score"
-                  ? <input type="number" defaultValue={s.avgScore} autoFocus onBlur={e=>{update(s.id,"avgScore",e.target.value);setEditing(null);}} style={{ width:60, border:`1px solid ${C.accent}`, borderRadius:6, padding:"4px 8px", fontSize:13 }} />
-                  : <span onClick={()=>setEditing(s.id+"score")} style={{ cursor:"pointer", fontWeight:700, color:s.avgScore>=90?C.green:s.avgScore>=75?C.accent:C.yellow, borderBottom:`1px dashed ${C.border}` }}>{s.avgScore}</span>
-                }
-              </td>
-              <td style={{ padding:"11px 12px" }}>
-                <select value={s.homework} onChange={e=>update(s.id,"homework",e.target.value)}
-                  style={{ border:`1px solid ${s.homework==="완료"?C.green:C.red}`, borderRadius:6, padding:"3px 8px", fontSize:12, color:s.homework==="완료"?C.green:C.red, background:s.homework==="완료"?C.greenSoft:C.redSoft }}>
-                  <option value="완료">완료</option><option value="미제출">미제출</option>
-                </select>
-              </td>
-              <td style={{ padding:"11px 12px" }}>
-                <select value={s.trend} onChange={e=>update(s.id,"trend",e.target.value)}
-                  style={{ border:`1px solid ${C.border}`, borderRadius:6, padding:"3px 8px", fontSize:12 }}>
-                  <option value="up">↑ 상승</option><option value="same">→ 유지</option><option value="down">↓ 하락</option>
-                </select>
-              </td>
-              <td style={{ padding:"11px 12px", fontSize:11, color:C.muted }}>{s.parentPhone}</td>
-            </tr>;
-          })}
-        </tbody>
-      </table>
-    </Card>
+
+    <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+      {filtered.map(s => {
+        const cls = classes.find(c=>c.id===s.classId);
+        return (
+          <Card key={s.id} style={{ padding:"14px 16px" }}>
+            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:10 }}>
+              <div>
+                <div style={{ fontSize:14, fontWeight:700 }}>{s.name}</div>
+                <div style={{ fontSize:11, color:C.muted, marginTop:2 }}>{cls?.name||"-"} · {s.parentPhone||"연락처 없음"}</div>
+              </div>
+              <select value={s.homework} onChange={e=>update(s.id,"homework",e.target.value)}
+                style={{ border:`1px solid ${s.homework==="완료"?C.green:C.red}`, borderRadius:8, padding:"5px 10px", fontSize:12, color:s.homework==="완료"?C.green:C.red, background:s.homework==="완료"?C.greenSoft:C.redSoft, fontWeight:600, cursor:"pointer" }}>
+                <option value="완료">✓ 완료</option>
+                <option value="미제출">✗ 미제출</option>
+              </select>
+            </div>
+            <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+              <div style={{ fontSize:11, color:C.muted, flexShrink:0 }}>평균 점수</div>
+              <div style={{ flex:1, height:6, background:C.border, borderRadius:3, overflow:"hidden" }}>
+                <div style={{ height:"100%", width:`${s.avgScore}%`, background:s.avgScore>=90?C.green:s.avgScore>=75?C.accent:C.yellow, borderRadius:3, transition:"width 0.4s" }} />
+              </div>
+              {editing===s.id+"score"
+                ? <input type="number" defaultValue={s.avgScore} autoFocus
+                    onBlur={e=>{update(s.id,"avgScore",e.target.value);setEditing(null);}}
+                    style={{ width:56, border:`1px solid ${C.accent}`, borderRadius:6, padding:"3px 6px", fontSize:13, fontWeight:700, textAlign:"center" }} />
+                : <span onClick={()=>setEditing(s.id+"score")}
+                    style={{ fontSize:14, fontWeight:800, color:s.avgScore>=90?C.green:s.avgScore>=75?C.accent:C.yellow, cursor:"pointer", minWidth:32, textAlign:"right", borderBottom:`1.5px dashed ${C.border}` }}>
+                    {s.avgScore}
+                  </span>
+              }
+            </div>
+          </Card>
+        );
+      })}
+      {filtered.length===0 && <Card style={{ textAlign:"center", padding:"32px", color:C.dim }}>학생이 없습니다</Card>}
+    </div>
   </div>;
 }
 
