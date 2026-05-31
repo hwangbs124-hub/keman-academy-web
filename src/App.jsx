@@ -578,7 +578,7 @@ function StudentsPanel({ store }) {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         </div>
 
         {/* 추가 방식 선택 */}
