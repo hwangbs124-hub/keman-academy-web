@@ -3,16 +3,135 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#0F1117" />
+    <meta name="theme-color" content="#2563EB" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <!-- PWA: 홈화면에 추가 시 앱처럼 동작 -->
+    <link rel="apple-touch-icon" href="/apple-touch-icon.svg" />
+    <!-- PWA -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="키맨학원 관리" />
-    <title>키맨키맨학원 관리 시스템</title>
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="키맨학원" />
+    <title>키맨학원 관리 시스템</title>
+    <style>
+      /* 스플래시 초기 화면 - JS 로드 전 표시 */
+      #splash {
+        position: fixed; inset: 0; z-index: 9999;
+        background: #fff;
+        display: flex; flex-direction: column;
+        align-items: center; justify-content: center;
+        gap: 0;
+        font-family: 'Noto Sans KR', -apple-system, sans-serif;
+        transition: opacity 0.5s ease, transform 0.5s ease;
+      }
+      #splash.hide {
+        opacity: 0; transform: scale(1.03); pointer-events: none;
+      }
+      .splash-top-bar {
+        position: absolute; top: 0; left: 0; right: 0; height: 4px;
+        background: linear-gradient(90deg, #3B82F6, #2563EB, #3B82F6);
+        background-size: 200% 100%;
+        animation: shimmer 2s linear infinite;
+      }
+      @keyframes shimmer {
+        0% { background-position: 200% 0; }
+        100% { background-position: -200% 0; }
+      }
+      .splash-dots-bg {
+        position: absolute; inset: 0;
+        background-image: radial-gradient(circle, #DBEAFE 1px, transparent 1px);
+        background-size: 24px 24px;
+        opacity: 0.4;
+      }
+      .splash-glow {
+        position: absolute;
+        width: 340px; height: 340px;
+        background: radial-gradient(circle, #EFF6FF 0%, transparent 70%);
+        top: 50%; left: 50%;
+        transform: translate(-50%, -50%);
+      }
+      .splash-logo {
+        position: relative; z-index: 2;
+        display: flex; flex-direction: column; align-items: center; gap: 18px;
+        animation: fadeUp 0.7s ease both;
+      }
+      @keyframes fadeUp {
+        from { opacity: 0; transform: translateY(24px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      .splash-icon {
+        width: 88px; height: 88px;
+        border-radius: 22px;
+        background: #fff;
+        border: 2px solid rgba(37,99,235,0.12);
+        display: flex; flex-direction: column;
+        align-items: center; justify-content: center;
+        box-shadow: 0 8px 32px rgba(37,99,235,0.14), 0 2px 8px rgba(0,0,0,0.06);
+        gap: 0;
+      }
+      .splash-icon .k { font-size: 46px; font-weight: 900; color: #2563EB; line-height: 1; }
+      .splash-icon .km { font-size: 9px; font-weight: 700; color: #2563EB; letter-spacing: 0.15em; opacity: 0.55; }
+      .splash-title { font-size: 26px; font-weight: 900; color: #0F172A; letter-spacing: -0.5px; text-align: center; }
+      .splash-title span { color: #2563EB; }
+      .splash-sub { font-size: 12px; color: #94A3B8; letter-spacing: 0.1em; font-weight: 500; }
+      .splash-bottom {
+        position: absolute; bottom: 48px; left: 0; right: 0;
+        display: flex; flex-direction: column; align-items: center; gap: 10px;
+        z-index: 2;
+        animation: fadeUp 0.9s 0.4s ease both; opacity: 0; animation-fill-mode: forwards;
+      }
+      .splash-loading { display: flex; gap: 6px; }
+      .splash-dot {
+        width: 6px; height: 6px; border-radius: 50%;
+        background: #3B82F6;
+        animation: blink 1.4s ease-in-out infinite;
+      }
+      .splash-dot:nth-child(2) { animation-delay: 0.2s; }
+      .splash-dot:nth-child(3) { animation-delay: 0.4s; }
+      @keyframes blink {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50% { opacity: 0.3; transform: scale(0.7); }
+      }
+      .splash-copy { font-size: 11px; color: #CBD5E1; }
+    </style>
   </head>
   <body>
+    <!-- 스플래시 화면 -->
+    <div id="splash">
+      <div class="splash-top-bar"></div>
+      <div class="splash-dots-bg"></div>
+      <div class="splash-glow"></div>
+      <div class="splash-logo">
+        <div class="splash-icon">
+          <div class="k">K</div>
+          <div class="km">KEYMAN</div>
+        </div>
+        <div>
+          <div class="splash-title"><span>키맨</span>학원</div>
+          <div class="splash-sub" style="text-align:center;margin-top:6px;">원장 관리 시스템</div>
+        </div>
+      </div>
+      <div class="splash-bottom">
+        <div class="splash-loading">
+          <div class="splash-dot"></div>
+          <div class="splash-dot"></div>
+          <div class="splash-dot"></div>
+        </div>
+        <div class="splash-copy">© 키맨학원</div>
+      </div>
+    </div>
+
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
+    <script>
+      // React 로드 완료 후 스플래시 숨기기
+      window.addEventListener('load', () => {
+        setTimeout(() => {
+          const splash = document.getElementById('splash');
+          if (splash) {
+            splash.classList.add('hide');
+            setTimeout(() => splash.remove(), 600);
+          }
+        }, 1400);
+      });
+    </script>
   </body>
 </html>
