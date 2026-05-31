@@ -639,22 +639,36 @@ function ClassesPanel({ store }) {
 
 // ── 시간표 ──
 function SchedulePanel({ store }) {
-  const { classes } = store;
+  const { classes, setClasses } = store;
+  const [modal, setModal] = useState(null); // null | class obj
+  const [form, setForm] = useState({});
+
+  const open = (c) => { setForm({...c}); setModal(c); };
+  const save = () => {
+    setClasses(p => p.map(c => c.id === form.id ? {...form} : c));
+    setModal(null);
+  };
+  const toggleDay = (d) => setForm(p => ({...p, days: p.days?.includes(d) ? p.days.filter(x=>x!==d) : [...(p.days||[]), d]}));
+
   return <div className="fade">
-    <Hdr title="주간 시간표" />
+    <Hdr title="주간 시간표" sub="수업 카드를 클릭하면 수정할 수 있어요" />
     <div style={{ display:"grid", gridTemplateColumns:"repeat(7,1fr)", gap:10 }}>
-      {DAYS.map((day,di) => {
-        const dayClasses = classes.filter(c=>c.days?.includes(day));
+      {DAYS.map((day, di) => {
+        const dayClasses = classes.filter(c => c.days?.includes(day));
         return <Card key={day} style={{ minHeight:240, padding:14 }}>
           <div style={{ fontSize:13, fontWeight:700, color:di>=5?C.accent:C.text, marginBottom:12 }}>{day}</div>
           <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-            {dayClasses.length===0
+            {dayClasses.length === 0
               ? <div style={{ fontSize:11, color:C.dim, textAlign:"center", paddingTop:16 }}>없음</div>
-              : dayClasses.map((c,i) => (
-                <div key={c.id} style={{ background:COLORS_LIST[i%COLORS_LIST.length]+"12", borderLeft:`3px solid ${COLORS_LIST[i%COLORS_LIST.length]}`, borderRadius:8, padding:"9px 10px" }}>
+              : dayClasses.map((c, i) => (
+                <div key={c.id} onClick={() => open(c)}
+                  style={{ background:COLORS_LIST[i%COLORS_LIST.length]+"12", borderLeft:`3px solid ${COLORS_LIST[i%COLORS_LIST.length]}`, borderRadius:8, padding:"9px 10px", cursor:"pointer", transition:"all 0.15s" }}
+                  onMouseEnter={e => e.currentTarget.style.opacity="0.75"}
+                  onMouseLeave={e => e.currentTarget.style.opacity="1"}>
                   <div style={{ fontSize:10, color:COLORS_LIST[i%COLORS_LIST.length], fontWeight:700, marginBottom:3 }}>{c.time}</div>
                   <div style={{ fontSize:11, fontWeight:600 }}>{c.name}</div>
                   <div style={{ fontSize:10, color:C.muted }}>{c.room}</div>
+                  <div style={{ fontSize:9, color:C.dim, marginTop:3 }}>✏ 클릭하여 수정</div>
                 </div>
               ))
             }
@@ -662,6 +676,56 @@ function SchedulePanel({ store }) {
         </Card>;
       })}
     </div>
+
+    {/* 전체 목록 */}
+    <Card style={{ marginTop:16 }}>
+      <div style={{ fontSize:14, fontWeight:700, marginBottom:14 }}>전체 수업 목록</div>
+      <table style={{ width:"100%", borderCollapse:"collapse" }}>
+        <thead><tr style={{ borderBottom:`1px solid ${C.border}` }}>
+          {["반 이름","담당 선생님","수업 시간","강의실","요일",""].map(h=>(
+            <th key={h} style={{ textAlign:"left", padding:"8px 12px", fontSize:11, color:C.muted, fontWeight:500 }}>{h}</th>
+          ))}
+        </tr></thead>
+        <tbody>
+          {classes.map((c, i) => (
+            <tr key={c.id} className="rh" style={{ borderBottom:`1px solid ${C.border}22` }}>
+              <td style={{ padding:"11px 12px", fontWeight:600, fontSize:13, color:COLORS_LIST[i%COLORS_LIST.length] }}>{c.name}</td>
+              <td style={{ padding:"11px 12px", fontSize:12, color:C.muted }}>{c.teacher}</td>
+              <td style={{ padding:"11px 12px", fontSize:12, color:C.muted }}>{c.time}</td>
+              <td style={{ padding:"11px 12px", fontSize:12, color:C.muted }}>{c.room}</td>
+              <td style={{ padding:"11px 12px" }}>
+                <div style={{ display:"flex", gap:4, flexWrap:"wrap" }}>
+                  {(c.days||[]).map(d => <span key={d} style={{ fontSize:10, padding:"2px 6px", borderRadius:4, background:COLORS_LIST[i%COLORS_LIST.length]+"18", color:COLORS_LIST[i%COLORS_LIST.length], fontWeight:700 }}>{d}</span>)}
+                </div>
+              </td>
+              <td style={{ padding:"11px 12px" }}>
+                <Btn small outline onClick={() => open(c)}>수정</Btn>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </Card>
+
+    {/* 수정 모달 */}
+    {modal && <Modal title={`"${form.name}" 수정`} onClose={() => setModal(null)}>
+      <Input label="반 이름" value={form.name||""} onChange={v=>setForm(p=>({...p,name:v}))} placeholder="예: 수학 심화반" />
+      <Input label="담당 선생님" value={form.teacher||""} onChange={v=>setForm(p=>({...p,teacher:v}))} placeholder="선생님 이름" />
+      <Input label="수업 시간" value={form.time||""} onChange={v=>setForm(p=>({...p,time:v}))} placeholder="예: 월·수 16:00" />
+      <Input label="강의실" value={form.room||""} onChange={v=>setForm(p=>({...p,room:v}))} placeholder="예: A101" />
+      <div style={{ marginBottom:14 }}>
+        <label style={{ fontSize:11, color:C.muted, display:"block", marginBottom:8, fontWeight:500 }}>수업 요일</label>
+        <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
+          {DAYS.map(d => (
+            <button key={d} onClick={() => toggleDay(d)} style={{ width:38, height:38, borderRadius:8, fontSize:13, fontWeight:600, border:`1.5px solid ${form.days?.includes(d)?C.accent:C.border}`, background:form.days?.includes(d)?C.accentSoft:"#fff", color:form.days?.includes(d)?C.accent:C.muted, cursor:"pointer" }}>{d}</button>
+          ))}
+        </div>
+      </div>
+      <div style={{ display:"flex", gap:10, justifyContent:"flex-end" }}>
+        <Btn outline color={C.muted} onClick={() => setModal(null)}>취소</Btn>
+        <Btn onClick={save}>저장</Btn>
+      </div>
+    </Modal>}
   </div>;
 }
 
