@@ -170,7 +170,6 @@ const NAV = [
   { id:"grades",    icon:"◈", label:"성적/과제" },
   { id:"notice",    icon:"◉", label:"공지/메시지" },
   { id:"sms",       icon:"✉", label:"문자 발송" },
-  { id:"report",    icon:"◧", label:"수업 보고서" },
   { id:"coaching",  icon:"★", label:"코칭 리포트" },
   { id:"settings",  icon:"⚙", label:"설정" },
 ];
@@ -235,7 +234,6 @@ export default function App() {
         {nav==="grades"    && <GradesPanel store={store} />}
         {nav==="notice"    && <NoticePanel store={store} />}
         {nav==="sms"       && <SMSPanel store={store} />}
-        {nav==="report"    && <ReportPanel store={store} />}
         {nav==="coaching"  && <CoachingPanel store={store} />}
         {nav==="settings"  && <SettingsPanel store={store} />}
       </main>
@@ -1066,28 +1064,7 @@ function ReportPanel({ store }) {
           <div style={{ fontSize:13, color:C.muted }}>보고서를 작성하고 있습니다...</div>
         </Card>}
         {report&&!generating && <Card className="fade" style={{ border:`1px solid ${C.accent}30` }}>
-          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:16 }}>
-            <div>
-              <div style={{ fontSize:16, fontWeight:800 }}>{report.title}</div>
-              <div style={{ fontSize:11, color:C.muted, marginTop:3 }}>{report.date} · {report.class} · {report.studentName}</div>
-            </div>
-            <div style={{ display:"flex", gap:8 }}>
-              <Btn small outline onClick={copy}>{copied?"✓ 복사됨":"복사"}</Btn>
-              <Btn small onClick={save}>저장</Btn>
-            </div>
-          </div>
-          {[
-            {icon:"📋",title:"수업 요약",color:C.accent,content:<p style={{fontSize:13,color:C.muted,lineHeight:1.8}}>{report.summary}</p>},
-            {icon:"✅",title:"주요 성과",color:C.green,content:report.achievements?.map((a,i)=><div key={i} style={{fontSize:13,color:C.muted,marginBottom:5}}>• {a}</div>)},
-            {icon:"⚠️",title:"개선점",color:C.yellow,content:report.concerns?.map((c,i)=><div key={i} style={{fontSize:13,color:C.muted,marginBottom:5}}>• {c}</div>)},
-            {icon:"📅",title:"다음 수업",color:"#A78BFA",content:<p style={{fontSize:13,color:C.muted,lineHeight:1.8}}>{report.nextPlan}</p>},
-            {icon:"💬",title:"학부모 메시지",color:C.red,content:<div style={{background:C.bg,borderRadius:8,padding:"11px 13px",fontSize:13,lineHeight:1.8}}>{report.parentMessage}</div>},
-          ].map(s=>(
-            <div key={s.title} style={{ background:C.bg, borderRadius:10, padding:"13px 15px", marginBottom:10, borderLeft:`3px solid ${s.color}` }}>
-              <div style={{ fontSize:12, fontWeight:700, color:s.color, marginBottom:8 }}>{s.icon} {s.title}</div>
-              {s.content}
-            </div>
-          ))}
+          <ReportResult report={report} setReport={setReport} onSave={save} onCopy={copy} copied={copied} student={student} />
         </Card>}
       </div>
     </div>}
@@ -1118,6 +1095,104 @@ function SettingsPanel({ store }) {
   const { settings, setSettings } = store;
   const [form, setForm] = useState({...settings});
   const [saved, setSaved] = useState(false);
+
+
+// ── 수업 보고서 결과 카드 (수정 + SMS 발송) ──
+function ReportResult({ report, setReport, onSave, onCopy, copied, student }) {
+  const [editMode, setEditMode] = useState(false);
+  const [draft, setDraft] = useState(report);
+  const [sending, setSending] = useState(false);
+  const [sendResult, setSendResult] = useState(null);
+
+  const fields = [
+    { key:"summary",       icon:"📋", title:"수업 요약",     color:C.accent,   multiline:true },
+    { key:"achievements",  icon:"✅", title:"주요 성과",     color:C.green,    list:true },
+    { key:"concerns",      icon:"⚠️", title:"개선점",        color:C.yellow,   list:true },
+    { key:"nextPlan",      icon:"📅", title:"다음 수업",     color:"#A78BFA",  multiline:true },
+    { key:"parentMessage", icon:"💬", title:"학부모 메시지", color:C.red,      multiline:true },
+  ];
+
+  const saveEdit = () => { setReport(draft); setEditMode(false); };
+
+  const sendSMS = async () => {
+    if (!student?.parentPhone) return alert("학부모 연락처가 없습니다. 학생 관리에서 연락처를 추가해주세요.");
+    setSending(true); setSendResult(null);
+    const to = student.parentPhone.replace(/-/g,"");
+    try {
+      const res = await sendSolapiSMS({ to, text: draft.parentMessage || report.parentMessage, type:"sms" });
+      setSendResult(res.error ? { ok:false, msg:res.error } : { ok:true, msg:"발송 성공!" });
+    } catch(e) { setSendResult({ ok:false, msg:e.message }); }
+    setSending(false);
+  };
+
+  return <>
+    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:16 }}>
+      <div>
+        <div style={{ fontSize:16, fontWeight:800 }}>{draft.title}</div>
+        <div style={{ fontSize:11, color:C.muted, marginTop:3 }}>{draft.date} · {draft.class} · {draft.studentName}</div>
+      </div>
+      <div style={{ display:"flex", gap:8, flexWrap:"wrap", justifyContent:"flex-end" }}>
+        {!editMode ? <>
+          <Btn small outline onClick={()=>{setDraft(report);setEditMode(true);}}>✏ 수정</Btn>
+          <Btn small outline onClick={onCopy}>{copied?"✓ 복사됨":"복사"}</Btn>
+          <Btn small onClick={onSave}>저장</Btn>
+        </> : <>
+          <Btn small outline color={C.muted} onClick={()=>setEditMode(false)}>취소</Btn>
+          <Btn small onClick={saveEdit}>✓ 수정 완료</Btn>
+        </>}
+      </div>
+    </div>
+
+    {fields.map(f => (
+      <div key={f.key} style={{ background:C.bg, borderRadius:10, padding:"13px 15px", marginBottom:10, borderLeft:`3px solid ${f.color}` }}>
+        <div style={{ fontSize:12, fontWeight:700, color:f.color, marginBottom:8 }}>{f.icon} {f.title}</div>
+        {editMode ? (
+          f.list ? (
+            <div>
+              {(draft[f.key]||[]).map((item,i) => (
+                <div key={i} style={{ display:"flex", gap:8, marginBottom:6 }}>
+                  <input value={item} onChange={e=>{const arr=[...(draft[f.key]||[])];arr[i]=e.target.value;setDraft(p=>({...p,[f.key]:arr}));}}
+                    style={{ flex:1, border:`1px solid ${C.border}`, borderRadius:6, padding:"6px 10px", fontSize:12 }} />
+                  <button onClick={()=>setDraft(p=>({...p,[f.key]:p[f.key].filter((_,j)=>j!==i)}))} style={{ color:C.red, fontSize:16 }}>✕</button>
+                </div>
+              ))}
+              <button onClick={()=>setDraft(p=>({...p,[f.key]:[...(p[f.key]||[]),""]}))}
+                style={{ fontSize:11, color:C.accent, background:C.accentSoft, border:"none", borderRadius:6, padding:"4px 10px", cursor:"pointer" }}>+ 항목 추가</button>
+            </div>
+          ) : (
+            <textarea value={draft[f.key]||""} onChange={e=>setDraft(p=>({...p,[f.key]:e.target.value}))} rows={3}
+              style={{ width:"100%", border:`1px solid ${C.border}`, borderRadius:8, padding:"8px 10px", fontSize:13, resize:"vertical" }} />
+          )
+        ) : (
+          f.list
+            ? (draft[f.key]||[]).map((a,i)=><div key={i} style={{fontSize:13,color:C.muted,marginBottom:5}}>• {a}</div>)
+            : f.key==="parentMessage"
+              ? <div style={{background:C.card,borderRadius:8,padding:"10px 12px",fontSize:13,lineHeight:1.8}}>{draft[f.key]}</div>
+              : <p style={{fontSize:13,color:C.muted,lineHeight:1.8}}>{draft[f.key]}</p>
+        )}
+      </div>
+    ))}
+
+    {/* SMS 발송 버튼 */}
+    {!editMode && (
+      <div style={{ marginTop:4, padding:"14px 16px", background:C.bg, borderRadius:10, display:"flex", alignItems:"center", gap:12 }}>
+        <div style={{ flex:1 }}>
+          <div style={{ fontSize:12, fontWeight:700, marginBottom:2 }}>📱 학부모 문자 발송</div>
+          <div style={{ fontSize:11, color:C.muted }}>{student?.parentPhone || "연락처 없음"} · 학부모 메시지 내용으로 발송</div>
+        </div>
+        <button className="bt" onClick={sendSMS} disabled={sending||!student?.parentPhone}
+          style={{ padding:"9px 18px", borderRadius:8, fontSize:13, fontWeight:700, border:"none", cursor:"pointer", background:sending?C.border:C.accent, color:sending?C.muted:"#fff" }}>
+          {sending?<><span className="spin" style={{display:"inline-block",marginRight:6}}>⟳</span>발송 중...</>:"✉ SMS 발송"}
+        </button>
+      </div>
+    )}
+    {sendResult && (
+      <div style={{ marginTop:8, padding:"10px 14px", borderRadius:8, background:sendResult.ok?C.greenSoft:C.redSoft, fontSize:12, color:sendResult.ok?C.green:C.red, fontWeight:600 }}>
+        {sendResult.ok?"✓":"✗"} {sendResult.msg}
+      </div>
+    )}
+  </>;
+}
 
   const save = () => { setSettings(form); setSaved(true); setTimeout(()=>setSaved(false),2000); };
 
@@ -1351,7 +1426,7 @@ ${report.teacherMessage}`;
             )}
 
             {report && !generating && (
-              <div className="fade">
+              <div className="fade" id="coaching-print-area">
                 {/* 리포트 헤더 */}
                 <div style={{ background: "linear-gradient(135deg,#3B7EF6,#A78BFA)", borderRadius: 14, padding: "22px 26px", marginBottom: 16, color: "#fff" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
@@ -1360,9 +1435,23 @@ ${report.teacherMessage}`;
                       <div style={{ fontSize: 22, fontWeight: 900, fontFamily: "'Space Grotesk',sans-serif" }}>{report.studentName} 학생</div>
                       <div style={{ fontSize: 12, opacity: 0.85, marginTop: 4 }}>{report.class} · {report.date} · 평균 {report.score}점</div>
                     </div>
-                    <div style={{ display: "flex", gap: 8 }}>
+                    <div style={{ display: "flex", gap: 8, flexWrap:"wrap" }}>
                       <button onClick={copy} style={{ padding: "6px 14px", borderRadius: 8, background: "rgba(255,255,255,0.2)", color: "#fff", fontSize: 12, fontWeight: 600, border: "none", cursor: "pointer" }}>{copied ? "✓ 복사됨" : "복사"}</button>
                       <button onClick={save} style={{ padding: "6px 14px", borderRadius: 8, background: "rgba(255,255,255,0.2)", color: "#fff", fontSize: 12, fontWeight: 600, border: "none", cursor: "pointer" }}>저장</button>
+                      <button onClick={()=>{
+                        const el = document.getElementById("coaching-print-area");
+                        if(!el) return;
+                        const w = window.open("","_blank");
+                        w.document.write(`<html><head><title>코칭 리포트 - ${report.studentName}</title><style>body{font-family:'Noto Sans KR',sans-serif;margin:20px;color:#1A202C}@media print{button{display:none}}</style></head><body>${el.innerHTML}</body></html>`);
+                        w.document.close(); w.focus(); setTimeout(()=>{w.print();},500);
+                      }} style={{ padding: "6px 14px", borderRadius: 8, background: "rgba(255,255,255,0.2)", color: "#fff", fontSize: 12, fontWeight: 600, border: "none", cursor: "pointer" }}>📄 PDF 저장</button>
+                      <button onClick={async()=>{
+                        if(!student?.parentPhone) return alert("연락처 없음");
+                        const msg = report.parentGuide?.[0] ? `[키맨학원 코칭 리포트] ${report.studentName} 학생 학습 성향 분석이 완료되었습니다. 학습 유형: ${report.studyProfile?.type}. ${report.parentGuide[0]}` : "";
+                        const to = student.parentPhone.replace(/-/g,"");
+                        const r = await sendSolapiSMS({to, text:msg, type:"sms"});
+                        alert(r.error ? "발송 실패: "+r.error : "✓ SMS 발송 완료!");
+                      }} style={{ padding: "6px 14px", borderRadius: 8, background: "rgba(255,255,255,0.2)", color: "#fff", fontSize: 12, fontWeight: 600, border: "none", cursor: "pointer" }}>✉ SMS 발송</button>
                     </div>
                   </div>
                 </div>
@@ -1435,7 +1524,7 @@ ${report.teacherMessage}`;
                 </div>
 
                 {/* 하단: 목표 + 교사 메시지 */}
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
                   <Card style={{ padding: 16 }}>
                     <div style={{ fontSize: 11, fontWeight: 700, color: C.accent, marginBottom: 12 }}>🎯 학습 목표</div>
                     {report.nextGoals?.map((g, i) => (
@@ -1450,6 +1539,9 @@ ${report.teacherMessage}`;
                     <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.8 }}>{report.teacherMessage}</div>
                   </Card>
                 </div>
+
+                {/* 수정 버튼 */}
+                <CoachingEditSection report={report} setReport={setReport} student={student} />
               </div>
             )}
           </div>
@@ -1477,6 +1569,88 @@ ${report.teacherMessage}`;
             ))
           }
         </div>
+      )}
+    </div>
+  );
+}
+
+// ── 코칭 리포트 수정 섹션 ──
+function CoachingEditSection({ report, setReport, student }) {
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState(report);
+
+  const save = () => { setReport(draft); setOpen(false); };
+
+  const editableFields = [
+    { key:"expertAnalysis", label:"전문가 종합 분석", multiline:true },
+    { key:"teacherMessage",  label:"교사 코칭 방향",  multiline:true },
+  ];
+
+  return (
+    <div style={{ marginTop:4 }}>
+      <div style={{ display:"flex", gap:10, justifyContent:"flex-end", marginBottom:8 }}>
+        <button onClick={()=>{setDraft(report);setOpen(o=>!o);}}
+          style={{ padding:"7px 16px", borderRadius:8, fontSize:12, fontWeight:600, border:`1px solid ${C.border}`, background:"#fff", cursor:"pointer", color:C.text }}>
+          {open ? "✕ 닫기" : "✏ 리포트 수정"}
+        </button>
+      </div>
+
+      {open && (
+        <Card className="fade" style={{ border:`1px solid ${C.accent}40` }}>
+          <div style={{ fontSize:14, fontWeight:700, marginBottom:16, color:C.accent }}>✏ 코칭 리포트 수정</div>
+
+          {/* 강점 수정 */}
+          <div style={{ marginBottom:16 }}>
+            <div style={{ fontSize:12, fontWeight:700, color:C.green, marginBottom:8 }}>✅ 강점</div>
+            {(draft.strengths||[]).map((s,i)=>(
+              <div key={i} style={{ display:"flex", gap:8, marginBottom:6 }}>
+                <input value={s} onChange={e=>{const a=[...(draft.strengths||[])];a[i]=e.target.value;setDraft(p=>({...p,strengths:a}));}}
+                  style={{ flex:1, border:`1px solid ${C.border}`, borderRadius:6, padding:"6px 10px", fontSize:12 }} />
+                <button onClick={()=>setDraft(p=>({...p,strengths:p.strengths.filter((_,j)=>j!==i)}))} style={{color:C.red}}>✕</button>
+              </div>
+            ))}
+            <button onClick={()=>setDraft(p=>({...p,strengths:[...(p.strengths||[]),""]}))} style={{ fontSize:11, color:C.green, background:C.greenSoft, border:"none", borderRadius:6, padding:"4px 10px", cursor:"pointer" }}>+ 추가</button>
+          </div>
+
+          {/* 보완점 수정 */}
+          <div style={{ marginBottom:16 }}>
+            <div style={{ fontSize:12, fontWeight:700, color:C.yellow, marginBottom:8 }}>⚠️ 보완점</div>
+            {(draft.weaknesses||[]).map((w,i)=>(
+              <div key={i} style={{ display:"flex", gap:8, marginBottom:6 }}>
+                <input value={w} onChange={e=>{const a=[...(draft.weaknesses||[])];a[i]=e.target.value;setDraft(p=>({...p,weaknesses:a}));}}
+                  style={{ flex:1, border:`1px solid ${C.border}`, borderRadius:6, padding:"6px 10px", fontSize:12 }} />
+                <button onClick={()=>setDraft(p=>({...p,weaknesses:p.weaknesses.filter((_,j)=>j!==i)}))} style={{color:C.red}}>✕</button>
+              </div>
+            ))}
+            <button onClick={()=>setDraft(p=>({...p,weaknesses:[...(p.weaknesses||[]),""]}))} style={{ fontSize:11, color:C.yellow, background:C.yellowSoft, border:"none", borderRadius:6, padding:"4px 10px", cursor:"pointer" }}>+ 추가</button>
+          </div>
+
+          {/* 학부모 가이드 수정 */}
+          <div style={{ marginBottom:16 }}>
+            <div style={{ fontSize:12, fontWeight:700, color:C.red, marginBottom:8 }}>👨‍👩‍👧 학부모 코칭 가이드</div>
+            {(draft.parentGuide||[]).map((g,i)=>(
+              <div key={i} style={{ display:"flex", gap:8, marginBottom:6 }}>
+                <textarea value={g} onChange={e=>{const a=[...(draft.parentGuide||[])];a[i]=e.target.value;setDraft(p=>({...p,parentGuide:a}));}} rows={2}
+                  style={{ flex:1, border:`1px solid ${C.border}`, borderRadius:6, padding:"6px 10px", fontSize:12, resize:"vertical" }} />
+                <button onClick={()=>setDraft(p=>({...p,parentGuide:p.parentGuide.filter((_,j)=>j!==i)}))} style={{color:C.red}}>✕</button>
+              </div>
+            ))}
+            <button onClick={()=>setDraft(p=>({...p,parentGuide:[...(p.parentGuide||[]),""]}))} style={{ fontSize:11, color:C.red, background:C.redSoft, border:"none", borderRadius:6, padding:"4px 10px", cursor:"pointer" }}>+ 추가</button>
+          </div>
+
+          {editableFields.map(f=>(
+            <div key={f.key} style={{ marginBottom:14 }}>
+              <label style={{ fontSize:12, fontWeight:700, color:C.text, display:"block", marginBottom:6 }}>{f.label}</label>
+              <textarea value={draft[f.key]||""} onChange={e=>setDraft(p=>({...p,[f.key]:e.target.value}))} rows={3}
+                style={{ width:"100%", border:`1px solid ${C.border}`, borderRadius:8, padding:"8px 10px", fontSize:13, resize:"vertical" }} />
+            </div>
+          ))}
+
+          <div style={{ display:"flex", gap:10, justifyContent:"flex-end" }}>
+            <Btn outline color={C.muted} onClick={()=>setOpen(false)}>취소</Btn>
+            <Btn onClick={save}>✓ 수정 완료</Btn>
+          </div>
+        </Card>
       )}
     </div>
   );
