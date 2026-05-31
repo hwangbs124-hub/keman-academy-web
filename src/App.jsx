@@ -497,7 +497,7 @@ function StudentsPanel({ store }) {
     <Card>
       <div className="table-scroll"><table style={{ width:"100%", borderCollapse:"collapse", minWidth:480 }}>
         <thead><tr style={{ borderBottom:`1px solid ${C.border}` }}>
-          {["이름","수강반","학부모 연락처","평균 점수","과제","추세",""].map(h=>(
+          {["이름","수강반","학부모 연락처","과제",""].map(h=>(
             <th key={h} style={{ textAlign:"left", padding:"8px 12px", fontSize:11, color:C.muted, fontWeight:500 }}>{h}</th>
           ))}
         </tr></thead>
@@ -508,16 +508,7 @@ function StudentsPanel({ store }) {
               <td style={{ padding:"12px", fontWeight:600, fontSize:13 }}>{s.name}</td>
               <td style={{ padding:"12px", fontSize:12, color:C.muted }}>{cls?.name||"미지정"}</td>
               <td style={{ padding:"12px", fontSize:12, color:C.muted }}>{s.parentPhone||"-"}</td>
-              <td style={{ padding:"12px" }}>
-                <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-                  <div style={{ width:50, height:4, background:C.border, borderRadius:2, overflow:"hidden" }}>
-                    <div style={{ height:"100%", width:`${s.avgScore}%`, background:s.avgScore>=90?C.green:s.avgScore>=75?C.accent:C.yellow, borderRadius:2 }} />
-                  </div>
-                  <span style={{ fontSize:13, fontWeight:700, color:s.avgScore>=90?C.green:s.avgScore>=75?C.accent:C.yellow }}>{s.avgScore}</span>
-                </div>
-              </td>
               <td style={{ padding:"12px" }}><Badge color={s.homework==="완료"?C.green:C.red}>{s.homework}</Badge></td>
-              <td style={{ padding:"12px", fontSize:15 }}>{s.trend==="up"?"↑":s.trend==="down"?"↓":"→"}</td>
               <td style={{ padding:"12px" }}>
                 <div style={{ display:"flex", gap:6 }}>
                   <Btn small outline onClick={()=>open(s)}>수정</Btn>
@@ -610,11 +601,8 @@ function StudentsPanel({ store }) {
       <Select label="수강반" value={form.classId||""} onChange={v=>setForm(p=>({...p,classId:Number(v)}))}
         options={classes.map(c=>({value:c.id,label:c.name}))} />
       <Input label="학부모 연락처" value={form.parentPhone||""} onChange={v=>setForm(p=>({...p,parentPhone:v}))} placeholder="010-0000-0000" />
-      <Input label="평균 점수" type="number" value={form.avgScore||""} onChange={v=>setForm(p=>({...p,avgScore:v}))} placeholder="0~100" />
       <Select label="과제 상태" value={form.homework||"완료"} onChange={v=>setForm(p=>({...p,homework:v}))}
         options={[{value:"완료",label:"완료"},{value:"미제출",label:"미제출"}]} />
-      <Select label="성적 추세" value={form.trend||"same"} onChange={v=>setForm(p=>({...p,trend:v}))}
-        options={[{value:"up",label:"↑ 상승"},{value:"same",label:"→ 유지"},{value:"down",label:"↓ 하락"}]} />
       <div style={{ display:"flex", gap:10, justifyContent:"flex-end", marginTop:8 }}>
         <Btn outline color={C.muted} onClick={()=>setModal(null)}>취소</Btn>
         <Btn onClick={save}>저장</Btn>
