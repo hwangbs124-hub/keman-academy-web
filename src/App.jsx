@@ -1834,6 +1834,7 @@ function ConsultPanel({ store }) {
   const [copied, setCopied] = useState(false);
   const [history, setHistory] = useStore("km_consult_history", []);
   const [sendChannel, setSendChannel] = useState("sms"); // "sms" | "friendtalk"
+  const [editMsg, setEditMsg] = useState(false);
 
   const selectedStudent = students.find(s => s.id === Number(selStudent));
   const selectedClass = selectedStudent ? classes.find(c => c.id === selectedStudent.classId) : null;
@@ -1860,6 +1861,7 @@ function ConsultPanel({ store }) {
     });
     setGenerated(msg);
     setSendResult(null);
+    setEditMsg(false);
   };
 
   const copy = () => {
@@ -2017,17 +2019,31 @@ function ConsultPanel({ store }) {
                     {CONSULT_TONE.find(t => t.id === tone)?.label}
                   </div>
                 </div>
-                <button onClick={copy} style={{ fontSize: 12, padding: "5px 12px", borderRadius: 7, border: `1px solid ${C.border}`, background: copied ? C.greenSoft : "#fff", color: copied ? C.green : C.muted, cursor: "pointer", fontWeight: 600 }}>
-                  {copied ? "✓ 복사됨" : "복사"}
-                </button>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button onClick={() => setEditMsg(e => !e)}
+                    style={{ fontSize: 12, padding: "5px 12px", borderRadius: 7, border: `1px solid ${editMsg ? C.accent : C.border}`, background: editMsg ? C.accentSoft : "#fff", color: editMsg ? C.accent : C.muted, cursor: "pointer", fontWeight: 600 }}>
+                    {editMsg ? "✓ 완료" : "✏ 수정"}
+                  </button>
+                  <button onClick={copy}
+                    style={{ fontSize: 12, padding: "5px 12px", borderRadius: 7, border: `1px solid ${C.border}`, background: copied ? C.greenSoft : "#fff", color: copied ? C.green : C.muted, cursor: "pointer", fontWeight: 600 }}>
+                    {copied ? "✓ 복사됨" : "복사"}
+                  </button>
+                </div>
               </div>
 
-              {/* 문자 내용 - 편집 가능 */}
-              <textarea value={generated} onChange={e => setGenerated(e.target.value)} rows={10}
-                style={{ width: "100%", border: `1px solid ${C.border}`, borderRadius: 10, padding: "14px", fontSize: 13, lineHeight: 1.8, resize: "vertical", background: C.bg, color: C.text }} />
+              {/* 문자 내용 */}
+              {editMsg ? (
+                <textarea value={generated} onChange={e => setGenerated(e.target.value)} rows={10} autoFocus
+                  style={{ width: "100%", border: `1.5px solid ${C.accent}`, borderRadius: 10, padding: "14px", fontSize: 13, lineHeight: 1.8, resize: "vertical", background: "#fff", color: C.text }} />
+              ) : (
+                <div style={{ background: C.bg, borderRadius: 10, padding: "14px", fontSize: 13, lineHeight: 1.8, color: C.text, whiteSpace: "pre-wrap", cursor: "pointer", border: `1px solid ${C.border}` }}
+                  onClick={() => setEditMsg(true)}>
+                  {generated}
+                </div>
+              )}
 
-              <div style={{ fontSize: 11, color: C.dim, marginTop: 6, marginBottom: 14 }}>
-                💡 내용을 직접 수정할 수 있어요 · {generated.length}자
+              <div style={{ fontSize: 11, color: editMsg ? C.accent : C.dim, marginTop: 6, marginBottom: 14 }}>
+                {editMsg ? "✏ 수정 중 · 완료 버튼을 누르거나 아래에서 발송하세요" : "💡 수정 버튼 또는 내용을 클릭하면 편집할 수 있어요"} · {generated.length}자
               </div>
 
               {/* 발송 채널 선택 */}
