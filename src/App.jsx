@@ -1305,7 +1305,7 @@ function ReportResult({ report, setReport, onSave, onCopy, copied, student }) {
         <div style={{ fontSize:14, fontWeight:700, marginBottom:16 }}>Vercel 환경변수 안내</div>
         <div style={{ fontSize:12, color:C.muted, lineHeight:2 }}>
           SMS/알림톡 발송을 위해 아래 환경변수를<br/>Vercel → Settings → Environment Variables 에 등록하세요.<br/><br/>
-          {[["SOLAPI_API_KEY","솔라피 API Key"],["SOLAPI_API_SECRET","솔라피 API Secret"],["SOLAPI_FROM_NUMBER","발신번호 (숫자만)"],["SOLAPI_KAKAO_PFID","카카오 채널 ID (알림톡용)"],["SOLAPI_KAKAO_TEMPLATE_ID","알림톡 템플릿 ID"]].map(([k,v])=>(
+          {[["SOLAPI_API_KEY","솔라피 API Key"],["SOLAPI_API_SECRET","솔라피 API Secret"],["SOLAPI_FROM_NUMBER","발신번호 (숫자만)"],["SOLAPI_KAKAO_PFID","카카오 채널 ID (알림톡용)"],["SOLAPI_KAKAO_TEMPLATE_ID","일반 알림톡 템플릿 ID"],["SOLAPI_KAKAO_COACHING_TEMPLATE_ID","코칭 리포트 알림톡 템플릿 ID"]].map(([k,v])=>(
             <div key={k} style={{ marginBottom:8 }}>
               <code style={{ background:C.bg, padding:"2px 7px", borderRadius:4, fontSize:11, color:C.accent }}>{k}</code>
               <span style={{ fontSize:11, color:C.dim, marginLeft:8 }}>{v}</span>
@@ -1540,13 +1540,6 @@ ${report.teacherMessage}`;
                         w.document.write(`<html><head><title>코칭 리포트 - ${report.studentName}</title><style>body{font-family:'Noto Sans KR',sans-serif;margin:20px;color:#1A202C}@media print{button{display:none}}</style></head><body>${el.innerHTML}</body></html>`);
                         w.document.close(); w.focus(); setTimeout(()=>{w.print();},500);
                       }} style={{ padding: "6px 14px", borderRadius: 8, background: "rgba(255,255,255,0.2)", color: "#fff", fontSize: 12, fontWeight: 600, border: "none", cursor: "pointer" }}>📄 PDF 저장</button>
-                      <button onClick={async()=>{
-                        if(!student?.parentPhone) return alert("연락처 없음");
-                        const msg = report.parentGuide?.[0] ? `[키맨학원 코칭 리포트] ${report.studentName} 학생 학습 성향 분석이 완료되었습니다. 학습 유형: ${report.studyProfile?.type}. ${report.parentGuide[0]}` : "";
-                        const to = student.parentPhone.replace(/-/g,"");
-                        const r = await sendSolapiSMS({to, text:msg, type:"sms"});
-                        alert(r.error ? "발송 실패: "+r.error : "✓ SMS 발송 완료!");
-                      }} style={{ padding: "6px 14px", borderRadius: 8, background: "rgba(255,255,255,0.2)", color: "#fff", fontSize: 12, fontWeight: 600, border: "none", cursor: "pointer" }}>✉ SMS 발송</button>
                     </div>
                   </div>
                 </div>
@@ -1828,7 +1821,7 @@ function ConsultPanel({ store }) {
   const { students, classes, settings } = store;
   const [consultType, setConsultType] = useState("new_inquiry");
   const [tone, setTone] = useState("warm");
-  const [mode, setMode] = useState("new"); // "new" | "existing"
+  const [mode, setMode] = useState("new");
   const [selStudent, setSelStudent] = useState("");
   const [parentName, setParentName] = useState("");
   const [studentName, setStudentName] = useState("");
@@ -1840,6 +1833,7 @@ function ConsultPanel({ store }) {
   const [toPhone, setToPhone] = useState("");
   const [copied, setCopied] = useState(false);
   const [history, setHistory] = useStore("km_consult_history", []);
+  const [sendChannel, setSendChannel] = useState("sms"); // "sms" | "friendtalk"
 
   const selectedStudent = students.find(s => s.id === Number(selStudent));
   const selectedClass = selectedStudent ? classes.find(c => c.id === selectedStudent.classId) : null;
@@ -1859,10 +1853,7 @@ function ConsultPanel({ store }) {
     const name = mode === "existing" ? (selectedStudent?.name || studentName) : studentName;
     const cls = mode === "existing" ? (selectedClass?.name || className) : className;
     const msg = generateConsultMsg({
-      type: consultType,
-      tone,
-      studentName: name,
-      className: cls,
+      type: consultType, tone, studentName: name, className: cls,
       teacherName: settings.directorName || "선생님",
       academyName: settings.academyName || "키맨학원",
       extraNote,
@@ -1883,12 +1874,16 @@ function ConsultPanel({ store }) {
     setSending(true); setSendResult(null);
     const to = phone.replace(/-/g, "");
     try {
-      const res = await sendSolapiSMS({ to, text: generated, type: "sms" });
-      const result = res.error ? { ok: false, msg: res.error } : { ok: true, msg: "발송 완료!" };
+      const res = await sendSolapiSMS({
+        to,
+        text: generated,
+        type: sendChannel === "friendtalk" ? "friendtalk" : "sms",
+      });
+      const result = res.error ? { ok: false, msg: res.error } : { ok: true, msg: sendChannel === "friendtalk" ? "친구톡 발송 완료!" : "SMS 발송 완료!" };
       setSendResult(result);
       if (result.ok) {
         const name = mode === "existing" ? (selectedStudent?.name || studentName) : studentName;
-        setHistory(p => [{ id: Date.now(), type: consultType, tone, name, phone, text: generated, date: new Date().toLocaleDateString("ko-KR") }, ...p.slice(0, 49)]);
+        setHistory(p => [{ id: Date.now(), type: consultType, tone, name, phone, text: generated, channel: sendChannel, date: new Date().toLocaleDateString("ko-KR") }, ...p.slice(0, 49)]);
       }
     } catch (e) { setSendResult({ ok: false, msg: e.message }); }
     setSending(false);
@@ -2035,14 +2030,38 @@ function ConsultPanel({ store }) {
                 💡 내용을 직접 수정할 수 있어요 · {generated.length}자
               </div>
 
+              {/* 발송 채널 선택 */}
+              <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
+                {[
+                  { id: "sms", label: "✉ SMS 문자", color: C.accent, bg: C.accentSoft },
+                  { id: "friendtalk", label: "💬 카카오 친구톡", color: "#3A1F00", bg: "#FEE500" },
+                ].map(ch => (
+                  <button key={ch.id} onClick={() => setSendChannel(ch.id)}
+                    style={{ flex: 1, padding: "9px", borderRadius: 8, fontSize: 12, fontWeight: 700, border: `1.5px solid ${sendChannel === ch.id ? (ch.id === "friendtalk" ? "#F0D000" : C.accent) : C.border}`, cursor: "pointer",
+                      background: sendChannel === ch.id ? ch.bg : "#fff",
+                      color: sendChannel === ch.id ? ch.color : C.muted }}>
+                    {ch.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* 친구톡 안내 */}
+              {sendChannel === "friendtalk" && (
+                <div className="fade" style={{ fontSize: 11, color: "#9A7A00", background: "#FFFDE7", border: "1px solid #FEE500", borderRadius: 8, padding: "8px 12px", marginBottom: 10, lineHeight: 1.7 }}>
+                  💬 <b>카카오 친구톡</b>은 학부모가 키맨학원 카카오 채널을 <b>친구 추가</b>한 경우에만 발송돼요.<br/>
+                  미추가 시 SMS로 자동 대체됩니다. Vercel 환경변수에 <b>SOLAPI_KAKAO_PFID</b> 등록 필요.
+                </div>
+              )}
+
               {/* 발송 */}
               <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
                 <input value={toPhone} onChange={e => setToPhone(e.target.value)} placeholder="010-0000-0000"
                   style={{ flex: 1, border: `1px solid ${C.border}`, borderRadius: 8, padding: "9px 12px", fontSize: 13 }} />
                 <button className="bt" onClick={send} disabled={sending}
                   style={{ padding: "9px 20px", borderRadius: 8, fontSize: 13, fontWeight: 700, border: "none", cursor: "pointer", flexShrink: 0,
-                    background: sending ? C.border : C.accent, color: sending ? C.muted : "#fff" }}>
-                  {sending ? <><span className="spin" style={{ display: "inline-block", marginRight: 4 }}>⟳</span>발송 중</> : "✉ SMS 발송"}
+                    background: sending ? C.border : sendChannel === "friendtalk" ? "#FEE500" : C.accent,
+                    color: sending ? C.muted : sendChannel === "friendtalk" ? "#3A1F00" : "#fff" }}>
+                  {sending ? <><span className="spin" style={{ display: "inline-block", marginRight: 4 }}>⟳</span>발송 중</> : sendChannel === "friendtalk" ? "💬 친구톡 발송" : "✉ SMS 발송"}
                 </button>
               </div>
 
@@ -2069,7 +2088,12 @@ function ConsultPanel({ store }) {
                       onClick={() => setGenerated(h.text)}>
                       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
                         <span style={{ fontSize: 12, fontWeight: 600 }}>{t?.icon} {h.name || "신규"} · {t?.label}</span>
-                        <span style={{ fontSize: 11, color: C.dim }}>{h.date}</span>
+                        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                          <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 4, background: h.channel === "friendtalk" ? "#FEE500" : C.accentSoft, color: h.channel === "friendtalk" ? "#7A5C00" : C.accent, fontWeight: 700 }}>
+                            {h.channel === "friendtalk" ? "친구톡" : "SMS"}
+                          </span>
+                          <span style={{ fontSize: 11, color: C.dim }}>{h.date}</span>
+                        </div>
                       </div>
                       <div style={{ fontSize: 11, color: C.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{h.text}</div>
                     </div>
