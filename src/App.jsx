@@ -389,6 +389,9 @@ export default function App() {
           </div>
         </div>
       </nav>
+    </div>
+  );
+}
 
 // ── 공통 컴포넌트 ──
 function Hdr({ title, sub }) {
