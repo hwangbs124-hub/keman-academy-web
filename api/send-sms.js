@@ -28,7 +28,7 @@ export default async function handler(req, res) {
   const coachingTmpl = process.env.SOLAPI_KAKAO_COACHING_TEMPLATE_ID || kakaoTmpl;
 
   if (!apiKey || !apiSecret || !from) {
-    return res.status(500).json({ error: "서버 환경변수(SOLAPI_API_KEY 등)가 설정되지 않았습니다." });
+    return res.status(500).json({ error: "서버 환경변수가 설정되지 않았습니다." });
   }
 
   try {
@@ -36,28 +36,25 @@ export default async function handler(req, res) {
     let message;
 
     if (type === "friendtalk" && kakaoPfId) {
-      // 카카오 친구톡 (자유 텍스트, 채널 친구만 수신)
+      // 카카오 친구톡 — pfId + text만으로 발송 (자유 텍스트)
       message = {
-        to, from,
+        to,
+        from,
+        text,
         kakaoOptions: {
           pfId: kakaoPfId,
-          messageType: "FT",  // FriendTalk
-          content: text,
         },
-        text, // SMS fallback
       };
     } else if (type === "kakao" && kakaoPfId) {
-      // 카카오 알림톡 (템플릿 필요)
+      // 카카오 알림톡 — 템플릿 ID 필요
       const isCoaching = variables && Object.keys(variables).some(k => k.includes("학습유형"));
-      const tmplId = isCoaching ? coachingTmpl : kakaoTmpl;
       message = {
-        to, from,
+        to, from, text,
         kakaoOptions: {
           pfId: kakaoPfId,
-          templateId: tmplId,
+          templateId: isCoaching ? coachingTmpl : kakaoTmpl,
           variables: variables || {},
         },
-        text,
       };
     } else {
       // 일반 SMS/LMS
