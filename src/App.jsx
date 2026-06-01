@@ -244,32 +244,62 @@ export default function App() {
         }
       `}</style>
 
-      {/* 데스크탑 사이드바 */}
-      <aside className="desktop-sidebar" style={{ width:72, background:C.card, borderRight:`1px solid ${C.border}`, flexDirection:"column", alignItems:"center", padding:"18px 0", position:"sticky", top:0, height:"100vh", zIndex:10, boxShadow:"2px 0 8px rgba(0,0,0,0.04)" }}>
-        <div style={{ width:36, height:36, background:C.accent, borderRadius:10, display:"flex", alignItems:"center", justifyContent:"center", fontSize:16, fontWeight:900, fontFamily:"'Space Grotesk',sans-serif", color:"#fff", marginBottom:4, boxShadow:`0 4px 12px rgba(59,126,246,0.3)` }}>K</div>
-        <div style={{ fontSize:8, color:C.accent, fontWeight:700, marginBottom:20 }}>{settings.academyName.slice(0,3)}</div>
-        <div style={{ display:"flex", flexDirection:"column", gap:4, width:"100%" }}>
-          {NAV.map(item => (
-            <button key={item.id} className={`ni${nav===item.id?" on":""}`} onClick={() => setNav(item.id)}
-              style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:2, padding:"9px 4px", borderRadius:8, margin:"0 6px", position:"relative" }} title={item.label}>
-              <span style={{ fontSize:16, color:nav===item.id?C.accent:C.dim }}>{item.icon}</span>
-              <span style={{ fontSize:8, color:nav===item.id?C.accent:C.dim, letterSpacing:"0.01em" }}>{item.label}</span>
-              {item.id==="notice"&&unread>0&&(
-                <span style={{ position:"absolute", top:4, right:8, width:13, height:13, background:C.red, borderRadius:"50%", fontSize:7, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:700, color:"#fff" }}>{unread}</span>
-              )}
-            </button>
-          ))}
-        </div>
-        <div style={{ marginTop:"auto", display:"flex", flexDirection:"column", alignItems:"center", gap:3 }}>
-          <div style={{ width:30, height:30, borderRadius:"50%", background:"linear-gradient(135deg,#3B7EF6,#6366F1)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:11, fontWeight:700, color:"#fff" }}>
-            {settings.directorName[0]}
-          </div>
-          <span style={{ fontSize:8, color:C.dim }}>{settings.directorName}</span>
-        </div>
-      </aside>
+  return (
+    <div style={{ minHeight:"100vh", background:C.bg, color:C.text, fontFamily:"'Noto Sans KR',sans-serif", display:"flex", flexDirection:"column" }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&family=Space+Grotesk:wght@400;500;700&display=swap');
+        *{box-sizing:border-box;margin:0;padding:0}
+        button{cursor:pointer;border:none;background:none;font-family:inherit}
+        input,textarea,select{font-family:inherit;outline:none}
+        .ni{transition:all 0.15s}.ni:hover{background:rgba(59,126,246,0.07)!important}.ni.on{background:rgba(59,126,246,0.12)!important}
+        .rh:hover{background:rgba(59,126,246,0.03)!important}
+        .bt{transition:all 0.15s}.bt:hover{opacity:0.85;transform:translateY(-1px)}
+        .fade{animation:fi 0.3s ease}@keyframes fi{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+        .spin{animation:sp 0.8s linear infinite}@keyframes sp{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+        ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:#E2E8F0;border-radius:2px}
+        .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.35);z-index:100;display:flex;align-items:center;justify-content:center;padding:16px}
+        .modal{background:#fff;border-radius:16px;padding:24px;width:100%;max-width:480px;max-height:90vh;overflow-y:auto}
+
+        .drawer-overlay{display:none;position:fixed;inset:0;background:rgba(15,23,42,0.4);z-index:40;backdrop-filter:blur(2px)}
+        .drawer-overlay.open{display:block}
+        .mobile-drawer{position:fixed;top:0;left:0;bottom:0;width:260px;background:#fff;z-index:50;box-shadow:4px 0 32px rgba(0,0,0,0.15);border-radius:0 24px 24px 0;display:flex;flex-direction:column;transform:translateX(-100%);transition:transform 0.28s cubic-bezier(0.4,0,0.2,1)}
+        .mobile-drawer.open{transform:translateX(0)}
+
+        .grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+        .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+        .grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+        .grid-7{display:grid;grid-template-columns:repeat(7,1fr);gap:10px}
+        .grid-report{display:grid;grid-template-columns:1fr 1.4fr;gap:18px}
+        .grid-sms{display:grid;grid-template-columns:1fr 1.3fr;gap:18px}
+        .grid-coaching{display:grid;grid-template-columns:300px 1fr;gap:18px}
+        .grid-5col{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
+        .table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+
+        .mobile-topbar{display:none}
+        .desktop-sidebar{display:flex}
+
+        @media(max-width:768px){
+          .desktop-sidebar{display:none!important}
+          .mobile-topbar{display:flex;background:#fff;border-bottom:1px solid #E2E8F0;padding:12px 16px;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:30;flex-shrink:0}
+          .main-content{padding:16px 14px 24px!important}
+          .grid-4{grid-template-columns:repeat(2,1fr)!important;gap:10px!important}
+          .grid-2{grid-template-columns:1fr!important;gap:12px!important}
+          .grid-3{grid-template-columns:1fr!important;gap:10px!important}
+          .grid-7{grid-template-columns:repeat(2,1fr)!important;gap:8px!important}
+          .grid-report{grid-template-columns:1fr!important;gap:12px!important}
+          .grid-sms{grid-template-columns:1fr!important;gap:12px!important}
+          .grid-coaching{grid-template-columns:1fr!important;gap:12px!important}
+          .grid-5col{grid-template-columns:1fr 1fr!important;gap:8px!important}
+          .hide-mobile{display:none!important}
+        }
+        @media(max-width:480px){
+          .grid-4{grid-template-columns:repeat(2,1fr)!important}
+          .grid-5col{grid-template-columns:1fr!important}
+        }
+      `}</style>
 
       {/* 모바일 상단 바 */}
-      <div className="mobile-topbar" style={{ position:"sticky", top:0, zIndex:30 }}>
+      <div className="mobile-topbar">
         <div style={{ display:"flex", alignItems:"center", gap:10 }}>
           <div style={{ width:30, height:30, background:C.accent, borderRadius:8, display:"flex", alignItems:"center", justifyContent:"center", fontSize:14, fontWeight:900, color:"#fff" }}>K</div>
           <div>
@@ -277,32 +307,57 @@ export default function App() {
             <div style={{ fontSize:10, color:C.muted }}>{settings.academyName}</div>
           </div>
         </div>
-        <button onClick={()=>setDrawerOpen(true)} style={{ display:"flex", flexDirection:"column", gap:4, padding:"4px", background:"none", border:"none", cursor:"pointer" }}>
+        <button onClick={()=>setDrawerOpen(true)} style={{ display:"flex", flexDirection:"column", gap:5, padding:"6px", background:"none", border:"none", cursor:"pointer" }}>
           <span style={{ display:"block", width:22, height:2, borderRadius:2, background:C.accent }}></span>
           <span style={{ display:"block", width:16, height:2, borderRadius:2, background:C.accent }}></span>
           <span style={{ display:"block", width:20, height:2, borderRadius:2, background:C.accent }}></span>
         </button>
       </div>
 
-      <main className="main-content" style={{ flex:1, overflow:"auto", padding:"28px 32px" }}>
-        {nav==="dashboard" && <Dashboard store={store} setNav={setNav} />}
-        {nav==="students"  && <StudentsPanel store={store} />}
-        {nav==="classes"   && <ClassesPanel store={store} />}
-        {nav==="schedule"  && <SchedulePanel store={store} />}
-        {nav==="grades"    && <GradesPanel store={store} />}
-        {nav==="notice"    && <NoticePanel store={store} />}
-        {nav==="sms"       && <SMSPanel store={store} />}
-        {nav==="consult"   && <ConsultPanel store={store} />}
-        {nav==="coaching"  && <CoachingPanel store={store} />}
-        {nav==="settings"  && <SettingsPanel store={store} />}
-      </main>
+      {/* 사이드바 + 메인 가로 배치 */}
+      <div style={{ display:"flex", flex:1, minHeight:0 }}>
+
+        {/* 데스크탑 사이드바 */}
+        <aside className="desktop-sidebar" style={{ width:72, background:C.card, borderRight:`1px solid ${C.border}`, flexDirection:"column", alignItems:"center", padding:"18px 0", position:"sticky", top:0, height:"100vh", zIndex:10, boxShadow:"2px 0 8px rgba(0,0,0,0.04)", flexShrink:0 }}>
+          <div style={{ width:36, height:36, background:C.accent, borderRadius:10, display:"flex", alignItems:"center", justifyContent:"center", fontSize:16, fontWeight:900, color:"#fff", marginBottom:4, boxShadow:`0 4px 12px rgba(59,126,246,0.3)` }}>K</div>
+          <div style={{ fontSize:8, color:C.accent, fontWeight:700, marginBottom:20 }}>{settings.academyName.slice(0,3)}</div>
+          <div style={{ display:"flex", flexDirection:"column", gap:4, width:"100%", overflowY:"auto" }}>
+            {NAV.map(item => (
+              <button key={item.id} className={`ni${nav===item.id?" on":""}`} onClick={() => setNav(item.id)}
+                style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:2, padding:"9px 4px", borderRadius:8, margin:"0 6px", position:"relative" }} title={item.label}>
+                <span style={{ fontSize:16, color:nav===item.id?C.accent:C.dim }}>{item.icon}</span>
+                <span style={{ fontSize:8, color:nav===item.id?C.accent:C.dim }}>{item.label}</span>
+                {item.id==="notice"&&unread>0&&(
+                  <span style={{ position:"absolute", top:4, right:8, width:13, height:13, background:C.red, borderRadius:"50%", fontSize:7, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:700, color:"#fff" }}>{unread}</span>
+                )}
+              </button>
+            ))}
+          </div>
+          <div style={{ marginTop:"auto", display:"flex", flexDirection:"column", alignItems:"center", gap:3 }}>
+            <div style={{ width:30, height:30, borderRadius:"50%", background:"linear-gradient(135deg,#3B7EF6,#6366F1)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:11, fontWeight:700, color:"#fff" }}>{settings.directorName[0]}</div>
+            <span style={{ fontSize:8, color:C.dim }}>{settings.directorName}</span>
+          </div>
+        </aside>
+
+        <main className="main-content" style={{ flex:1, overflow:"auto", padding:"28px 32px", minWidth:0 }}>
+          {nav==="dashboard" && <Dashboard store={store} setNav={setNav} />}
+          {nav==="students"  && <StudentsPanel store={store} />}
+          {nav==="classes"   && <ClassesPanel store={store} />}
+          {nav==="schedule"  && <SchedulePanel store={store} />}
+          {nav==="grades"    && <GradesPanel store={store} />}
+          {nav==="notice"    && <NoticePanel store={store} />}
+          {nav==="sms"       && <SMSPanel store={store} />}
+          {nav==="consult"   && <ConsultPanel store={store} />}
+          {nav==="coaching"  && <CoachingPanel store={store} />}
+          {nav==="settings"  && <SettingsPanel store={store} />}
+        </main>
+      </div>
 
       {/* 모바일 드로어 오버레이 */}
       <div className={`drawer-overlay${drawerOpen?" open":""}`} onClick={()=>setDrawerOpen(false)} />
 
       {/* 모바일 사이드 드로어 */}
       <nav className={`mobile-drawer${drawerOpen?" open":""}`}>
-        {/* 드로어 헤더 */}
         <div style={{ padding:"20px 16px 14px", borderBottom:`1px solid ${C.border}`, display:"flex", alignItems:"center", gap:12 }}>
           <div style={{ width:36, height:36, background:C.accent, borderRadius:10, display:"flex", alignItems:"center", justifyContent:"center", fontSize:16, fontWeight:900, color:"#fff", flexShrink:0 }}>K</div>
           <div>
@@ -311,28 +366,22 @@ export default function App() {
           </div>
           <button onClick={()=>setDrawerOpen(false)} style={{ marginLeft:"auto", fontSize:20, color:C.dim, background:"none", border:"none", cursor:"pointer", padding:"4px" }}>✕</button>
         </div>
-
-        {/* 메뉴 목록 */}
-        <div style={{ flex:1, overflowY:"auto", padding:"10px 10px" }}>
+        <div style={{ flex:1, overflowY:"auto", padding:"10px" }}>
           {NAV.map(item => (
             <button key={item.id} onClick={()=>{setNav(item.id);setDrawerOpen(false);}}
-              style={{ width:"100%", display:"flex", alignItems:"center", gap:12, padding:"12px 14px", borderRadius:12, marginBottom:3, background:nav===item.id?C.accentSoft:"transparent", border:"none", cursor:"pointer", textAlign:"left", position:"relative" }}>
-              <span style={{ fontSize:18, width:24, textAlign:"center", flexShrink:0, color:nav===item.id?C.accent:C.dim }}>{item.icon}</span>
+              style={{ width:"100%", display:"flex", alignItems:"center", gap:12, padding:"13px 14px", borderRadius:12, marginBottom:3, background:nav===item.id?C.accentSoft:"transparent", border:"none", cursor:"pointer", textAlign:"left", position:"relative" }}>
+              <span style={{ fontSize:20, width:26, textAlign:"center", flexShrink:0, color:nav===item.id?C.accent:C.dim }}>{item.icon}</span>
               <span style={{ fontSize:14, fontWeight:nav===item.id?700:500, color:nav===item.id?C.accent:C.text }}>{item.label}</span>
               {item.id==="notice"&&unread>0&&(
                 <span style={{ marginLeft:"auto", background:C.red, color:"#fff", fontSize:10, fontWeight:700, width:18, height:18, borderRadius:"50%", display:"flex", alignItems:"center", justifyContent:"center" }}>{unread}</span>
               )}
-              {nav===item.id && <div style={{ position:"absolute", left:0, top:"50%", transform:"translateY(-50%)", width:3, height:20, background:C.accent, borderRadius:2 }} />}
+              {nav===item.id && <div style={{ position:"absolute", left:0, top:"50%", transform:"translateY(-50%)", width:3, height:24, background:C.accent, borderRadius:2 }} />}
             </button>
           ))}
         </div>
-
-        {/* 드로어 하단 */}
         <div style={{ padding:"14px 16px", borderTop:`1px solid ${C.border}` }}>
           <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-            <div style={{ width:32, height:32, borderRadius:"50%", background:"linear-gradient(135deg,#3B7EF6,#6366F1)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:13, fontWeight:700, color:"#fff" }}>
-              {settings.directorName[0]}
-            </div>
+            <div style={{ width:32, height:32, borderRadius:"50%", background:"linear-gradient(135deg,#3B7EF6,#6366F1)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:13, fontWeight:700, color:"#fff" }}>{settings.directorName[0]}</div>
             <div>
               <div style={{ fontSize:13, fontWeight:600, color:C.text }}>{settings.directorName}</div>
               <div style={{ fontSize:11, color:C.muted }}>원장</div>
@@ -340,9 +389,6 @@ export default function App() {
           </div>
         </div>
       </nav>
-    </div>
-  );
-}
 
 // ── 공통 컴포넌트 ──
 function Hdr({ title, sub }) {
