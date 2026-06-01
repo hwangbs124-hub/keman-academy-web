@@ -188,63 +188,6 @@ export default function App() {
   const store = { classes, setClasses, students, setStudents, notices, setNotices, templates, setTemplates, settings, setSettings };
 
   return (
-    <div style={{ minHeight:"100vh", background:C.bg, color:C.text, fontFamily:"'Noto Sans KR',sans-serif", display:"flex" }}>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&family=Space+Grotesk:wght@400;500;700&display=swap');
-        *{box-sizing:border-box;margin:0;padding:0}
-        button{cursor:pointer;border:none;background:none;font-family:inherit}
-        input,textarea,select{font-family:inherit;outline:none}
-        .ni{transition:all 0.15s}.ni:hover{background:rgba(59,126,246,0.07)!important}.ni.on{background:rgba(59,126,246,0.12)!important}
-        .rh:hover{background:rgba(59,126,246,0.03)!important}
-        .bt{transition:all 0.15s}.bt:hover{opacity:0.85;transform:translateY(-1px)}
-        .fade{animation:fi 0.3s ease}@keyframes fi{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
-        .spin{animation:sp 0.8s linear infinite}@keyframes sp{from{transform:rotate(0)}to{transform:rotate(360deg)}}
-        ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:#E2E8F0;border-radius:2px}
-        .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.35);z-index:100;display:flex;align-items:center;justify-content:center;padding:16px}
-        .modal{background:#fff;border-radius:16px;padding:24px;width:100%;max-width:480px;max-height:90vh;overflow-y:auto}
-
-        /* 모바일 드로어 */
-        .mobile-nav{display:none}
-        .desktop-sidebar{display:flex}
-        .drawer-overlay{display:none;position:fixed;inset:0;background:rgba(15,23,42,0.4);z-index:40;backdrop-filter:blur(2px)}
-        .drawer-overlay.open{display:block}
-        .mobile-drawer{display:none;position:fixed;top:0;left:0;bottom:0;width:240px;background:#fff;z-index:50;box-shadow:4px 0 32px rgba(0,0,0,0.15);border-radius:0 24px 24px 0;flex-direction:column;transform:translateX(-100%);transition:transform 0.28s cubic-bezier(0.4,0,0.2,1)}
-        .mobile-drawer.open{transform:translateX(0)}
-        .mobile-topbar{display:none;background:#fff;border-bottom:1px solid #E2E8F0;padding:12px 16px;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:30}
-
-        /* 반응형 그리드 */
-        .grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
-        .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
-        .grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
-        .grid-7{display:grid;grid-template-columns:repeat(7,1fr);gap:10px}
-        .grid-report{display:grid;grid-template-columns:1fr 1.4fr;gap:18px}
-        .grid-sms{display:grid;grid-template-columns:1fr 1.3fr;gap:18px}
-        .grid-coaching{display:grid;grid-template-columns:300px 1fr;gap:18px}
-        .grid-5col{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
-        .table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
-
-        @media(max-width:768px){
-          .desktop-sidebar{display:none!important}
-          .mobile-topbar{display:flex}
-          .mobile-drawer{display:flex}
-          .main-content{padding:16px 14px 24px!important}
-          .grid-4{grid-template-columns:repeat(2,1fr)!important;gap:10px!important}
-          .grid-2{grid-template-columns:1fr!important;gap:12px!important}
-          .grid-3{grid-template-columns:1fr!important;gap:10px!important}
-          .grid-7{grid-template-columns:repeat(2,1fr)!important;gap:8px!important}
-          .grid-report{grid-template-columns:1fr!important;gap:12px!important}
-          .grid-sms{grid-template-columns:1fr!important;gap:12px!important}
-          .grid-coaching{grid-template-columns:1fr!important;gap:12px!important}
-          .grid-5col{grid-template-columns:1fr 1fr!important;gap:8px!important}
-          .hide-mobile{display:none!important}
-        }
-        @media(max-width:480px){
-          .grid-4{grid-template-columns:repeat(2,1fr)!important}
-          .grid-5col{grid-template-columns:1fr!important}
-        }
-      `}</style>
-
-  return (
     <div style={{ minHeight:"100vh", background:C.bg, color:C.text, fontFamily:"'Noto Sans KR',sans-serif", display:"flex", flexDirection:"column" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&family=Space+Grotesk:wght@400;500;700&display=swap');
