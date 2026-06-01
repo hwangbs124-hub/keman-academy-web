@@ -1754,6 +1754,7 @@ const CONSULT_TYPES = [
   { id:"absent",        icon:"📞", label:"결석 확인 문자",    desc:"결석 시 걱정과 안부를 담은 문자" },
   { id:"event",         icon:"🎉", label:"특강/이벤트 안내",  desc:"특강, 모의고사, 이벤트 안내 문자" },
   { id:"renewal",       icon:"🔄", label:"재등록 권유",       desc:"수강 종료 전 재등록 안내 문자" },
+  { id:"kakao_invite",  icon:"💬", label:"카카오 채널 초대",  desc:"학부모 카카오 채널 친구 추가 안내 (친구톡 발송을 위한 필수 단계)" },
 ];
 
 const CONSULT_TONE = [
@@ -1808,6 +1809,10 @@ function generateConsultMsg({ type, tone, studentName, className, teacherName, a
     renewal: [
       `안녕하세요, ${acad} ${t}입니다 😊\n${s} 학생과 함께한 시간이 참 뜻깊었습니다!\n\n곧 수강 기간이 종료될 예정이라 안내드립니다 🔄\n${s} 학생이 꾸준히 성장하고 있어, 계속 함께하면 더 좋은 결과가 있을 것 같습니다.\n\n재등록 관련 문의는 편하게 연락 주세요!\n항상 응원합니다 🙏${extraNote ? "\n\n" + extraNote : ""}`,
       `${acad}입니다. ${s} 학생 수강 종료 안내드립니다.\n\n${s} 학생과 함께한 시간 정말 감사했습니다 🌟\n재등록 시 특별 혜택도 있으니 관심 가져주세요!\n언제든 연락 주세요 😊`,
+    ],
+    kakao_invite: [
+      `안녕하세요, ${acad}입니다 😊\n\n학부모님께 더 빠르고 편리하게 소식을 전달드리기 위해\n카카오톡 채널 친구 추가를 안내드립니다 💬\n\n📱 카카오톡 채널 추가 방법\n카카오톡 → 검색 → "${acad}" 검색 → 채널 추가\n\n채널을 추가하시면:\n✅ 수업 알림 및 공지 카카오톡으로 수신\n✅ 학습 현황 및 상담 내용 빠르게 전달\n✅ 중요 안내 문자 대신 카카오톡으로 편리하게\n\n${extraNote ? extraNote + "\n\n" : ""}채널 추가 후 더욱 편리한 소통으로 함께하겠습니다 🙏\n감사합니다!`,
+      `${acad}입니다.\n\n카카오톡으로 더 빠르게 소통하고 싶어 안내드려요 📱\n\n👇 아래 방법으로 채널을 추가해 주세요\n카카오톡 검색창에서 "${acad}" 검색 후 채널 추가\n\n추가하시면 수업 공지, 학습 알림을 카카오톡으로 바로 받으실 수 있습니다!\n${extraNote ? "\n" + extraNote + "\n" : ""}\n감사합니다 😊`,
     ],
   };
 
@@ -2007,6 +2012,16 @@ function ConsultPanel({ store }) {
                 boxShadow: "0 4px 16px rgba(59,126,246,0.3)", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
               💬 상담 문자 자동 생성
             </button>
+
+            {/* 채널 초대 선택 시 안내 */}
+            {consultType === "kakao_invite" && (
+              <div className="fade" style={{ background:"#FFFDE7", border:"1px solid #FEE500", borderRadius:10, padding:"12px 14px", fontSize:12, color:"#7A5C00", lineHeight:1.8 }}>
+                <b>💬 채널 초대 문자 안내</b><br/>
+                이 문자는 <b>SMS로 먼저 발송</b>하세요.<br/>
+                학부모가 채널 추가 후엔 이후 메시지를 <b>친구톡</b>으로 발송할 수 있어요!<br/>
+                <span style={{color:"#9A7A00"}}>순서: SMS 채널 초대 → 학부모 채널 추가 → 이후 친구톡 발송</span>
+              </div>
+            )}
           </Card>
 
           {/* 생성된 문자 미리보기 */}
