@@ -1,20 +1,12 @@
 // api/send-sms.js
-// Vercel Serverless Function — SMS + 카카오 알림톡 발송
-
 export const config = { runtime: "nodejs" };
 
 import { createHmac, randomBytes } from "crypto";
 
-function generateSignature(apiSecret, dateTime, salt) {
-  return createHmac("sha256", apiSecret)
-    .update(dateTime + salt)
-    .digest("hex");
-}
-
 function buildAuthHeader(apiKey, apiSecret) {
   const dateTime = new Date().toISOString();
   const salt = randomBytes(8).toString("hex");
-  const signature = generateSignature(apiSecret, dateTime, salt);
+  const signature = createHmac("sha256", apiSecret).update(dateTime + salt).digest("hex");
   return `HMAC-SHA256 apiKey=${apiKey}, date=${dateTime}, salt=${salt}, signature=${signature}`;
 }
 
@@ -25,16 +17,15 @@ export default async function handler(req, res) {
   if (req.method === "OPTIONS") return res.status(200).end();
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
-  const { to, text, type = "sms", pfId, templateId, variables } = req.body;
-
-  if (!to || !text) {
-    return res.status(400).json({ error: "to, text 파라미터가 필요합니다." });
-  }
+  const { to, text, type = "sms", templateId, variables } = req.body;
+  if (!to || !text) return res.status(400).json({ error: "to, text 파라미터가 필요합니다." });
 
   const apiKey    = process.env.SOLAPI_API_KEY;
   const apiSecret = process.env.SOLAPI_API_SECRET;
   const from      = process.env.SOLAPI_FROM_NUMBER;
-  const kakaoPfId = pfId || process.env.SOLAPI_KAKAO_PFID; // 카카오 채널 ID
+  const kakaoPfId = process.env.SOLAPI_KAKAO_PFID;
+  const kakaoTmpl = templateId || process.env.SOLAPI_KAKAO_TEMPLATE_ID;
+  const coachingTmpl = process.env.SOLAPI_KAKAO_COACHING_TEMPLATE_ID || kakaoTmpl;
 
   if (!apiKey || !apiSecret || !from) {
     return res.status(500).json({ error: "서버 환경변수(SOLAPI_API_KEY 등)가 설정되지 않았습니다." });
@@ -42,25 +33,34 @@ export default async function handler(req, res) {
 
   try {
     const authorization = buildAuthHeader(apiKey, apiSecret);
-
     let message;
 
-    if (type === "kakao" && kakaoPfId) {
-      // ── 카카오 알림톡 발송 ──
-      // 알림톡 실패 시 SMS로 자동 대체(fallback)
+    if (type === "friendtalk" && kakaoPfId) {
+      // 카카오 친구톡 (자유 텍스트, 채널 친구만 수신)
       message = {
-        to,
-        from,
+        to, from,
         kakaoOptions: {
           pfId: kakaoPfId,
-          templateId: templateId || process.env.SOLAPI_KAKAO_TEMPLATE_ID,
-          variables: variables || {},   // 템플릿 변수 (예: { "#{이름}": "홍길동" })
+          messageType: "FT",  // FriendTalk
+          content: text,
         },
-        // fallback: 알림톡 실패 시 SMS로 대체
+        text, // SMS fallback
+      };
+    } else if (type === "kakao" && kakaoPfId) {
+      // 카카오 알림톡 (템플릿 필요)
+      const isCoaching = variables && Object.keys(variables).some(k => k.includes("학습유형"));
+      const tmplId = isCoaching ? coachingTmpl : kakaoTmpl;
+      message = {
+        to, from,
+        kakaoOptions: {
+          pfId: kakaoPfId,
+          templateId: tmplId,
+          variables: variables || {},
+        },
         text,
       };
     } else {
-      // ── 일반 SMS/LMS 발송 ──
+      // 일반 SMS/LMS
       message = { to, from, text };
     }
 
@@ -71,11 +71,7 @@ export default async function handler(req, res) {
     });
 
     const data = await solapiRes.json();
-
-    if (data.errorCode) {
-      return res.status(400).json({ error: data.errorMessage || data.errorCode });
-    }
-
+    if (data.errorCode) return res.status(400).json({ error: data.errorMessage || data.errorCode });
     return res.status(200).json({ success: true, messageId: data.messageId, type });
   } catch (err) {
     return res.status(500).json({ error: err.message });
