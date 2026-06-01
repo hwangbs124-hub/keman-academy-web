@@ -177,6 +177,7 @@ const NAV = [
 
 export default function App() {
   const [nav, setNav] = useState("dashboard");
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [classes,   setClasses]   = useStore("km_classes",   INIT_CLASSES);
   const [students,  setStudents]  = useStore("km_students",  INIT_STUDENTS);
   const [notices,   setNotices]   = useStore("km_notices",   INIT_NOTICES);
@@ -202,9 +203,14 @@ export default function App() {
         .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.35);z-index:100;display:flex;align-items:center;justify-content:center;padding:16px}
         .modal{background:#fff;border-radius:16px;padding:24px;width:100%;max-width:480px;max-height:90vh;overflow-y:auto}
 
-        /* 모바일 하단 네비게이션 */
+        /* 모바일 드로어 */
         .mobile-nav{display:none}
         .desktop-sidebar{display:flex}
+        .drawer-overlay{display:none;position:fixed;inset:0;background:rgba(15,23,42,0.4);z-index:40;backdrop-filter:blur(2px)}
+        .drawer-overlay.open{display:block}
+        .mobile-drawer{display:none;position:fixed;top:0;left:0;bottom:0;width:240px;background:#fff;z-index:50;box-shadow:4px 0 32px rgba(0,0,0,0.15);border-radius:0 24px 24px 0;flex-direction:column;transform:translateX(-100%);transition:transform 0.28s cubic-bezier(0.4,0,0.2,1)}
+        .mobile-drawer.open{transform:translateX(0)}
+        .mobile-topbar{display:none;background:#fff;border-bottom:1px solid #E2E8F0;padding:12px 16px;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:30}
 
         /* 반응형 그리드 */
         .grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
@@ -219,23 +225,21 @@ export default function App() {
 
         @media(max-width:768px){
           .desktop-sidebar{display:none!important}
-          .mobile-nav{display:flex;position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid #E2E8F0;z-index:50;padding:4px 0;padding-bottom:env(safe-area-inset-bottom)}
-          .main-content{padding:16px 14px 80px!important}
+          .mobile-topbar{display:flex}
+          .mobile-drawer{display:flex}
+          .main-content{padding:16px 14px 24px!important}
           .grid-4{grid-template-columns:repeat(2,1fr)!important;gap:10px!important}
           .grid-2{grid-template-columns:1fr!important;gap:12px!important}
           .grid-3{grid-template-columns:1fr!important;gap:10px!important}
-          .grid-7{grid-template-columns:repeat(4,1fr)!important;gap:8px!important}
+          .grid-7{grid-template-columns:repeat(2,1fr)!important;gap:8px!important}
           .grid-report{grid-template-columns:1fr!important;gap:12px!important}
           .grid-sms{grid-template-columns:1fr!important;gap:12px!important}
           .grid-coaching{grid-template-columns:1fr!important;gap:12px!important}
           .grid-5col{grid-template-columns:1fr 1fr!important;gap:8px!important}
           .hide-mobile{display:none!important}
-          .page-header{font-size:18px!important}
-          .card-padding{padding:14px!important}
         }
         @media(max-width:480px){
           .grid-4{grid-template-columns:repeat(2,1fr)!important}
-          .grid-7{grid-template-columns:repeat(3,1fr)!important}
           .grid-5col{grid-template-columns:1fr!important}
         }
       `}</style>
@@ -264,6 +268,22 @@ export default function App() {
         </div>
       </aside>
 
+      {/* 모바일 상단 바 */}
+      <div className="mobile-topbar" style={{ position:"sticky", top:0, zIndex:30 }}>
+        <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+          <div style={{ width:30, height:30, background:C.accent, borderRadius:8, display:"flex", alignItems:"center", justifyContent:"center", fontSize:14, fontWeight:900, color:"#fff" }}>K</div>
+          <div>
+            <div style={{ fontSize:14, fontWeight:700, color:C.text }}>{NAV.find(n=>n.id===nav)?.label || "키맨학원"}</div>
+            <div style={{ fontSize:10, color:C.muted }}>{settings.academyName}</div>
+          </div>
+        </div>
+        <button onClick={()=>setDrawerOpen(true)} style={{ display:"flex", flexDirection:"column", gap:4, padding:"4px", background:"none", border:"none", cursor:"pointer" }}>
+          <span style={{ display:"block", width:22, height:2, borderRadius:2, background:C.accent }}></span>
+          <span style={{ display:"block", width:16, height:2, borderRadius:2, background:C.accent }}></span>
+          <span style={{ display:"block", width:20, height:2, borderRadius:2, background:C.accent }}></span>
+        </button>
+      </div>
+
       <main className="main-content" style={{ flex:1, overflow:"auto", padding:"28px 32px" }}>
         {nav==="dashboard" && <Dashboard store={store} setNav={setNav} />}
         {nav==="students"  && <StudentsPanel store={store} />}
@@ -277,18 +297,48 @@ export default function App() {
         {nav==="settings"  && <SettingsPanel store={store} />}
       </main>
 
-      {/* 모바일 하단 네비게이션 */}
-      <nav className="mobile-nav">
-        {NAV.map(item => (
-          <button key={item.id} onClick={() => setNav(item.id)}
-            style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", gap:2, padding:"6px 2px", position:"relative", background:"none", border:"none" }}>
-            <span style={{ fontSize:18, color:nav===item.id?C.accent:C.dim }}>{item.icon}</span>
-            <span style={{ fontSize:8, color:nav===item.id?C.accent:C.dim, letterSpacing:"0.01em" }}>{item.label}</span>
-            {item.id==="notice"&&unread>0&&(
-              <span style={{ position:"absolute", top:3, left:"50%", marginLeft:4, width:12, height:12, background:C.red, borderRadius:"50%", fontSize:7, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:700, color:"#fff" }}>{unread}</span>
-            )}
-          </button>
-        ))}
+      {/* 모바일 드로어 오버레이 */}
+      <div className={`drawer-overlay${drawerOpen?" open":""}`} onClick={()=>setDrawerOpen(false)} />
+
+      {/* 모바일 사이드 드로어 */}
+      <nav className={`mobile-drawer${drawerOpen?" open":""}`}>
+        {/* 드로어 헤더 */}
+        <div style={{ padding:"20px 16px 14px", borderBottom:`1px solid ${C.border}`, display:"flex", alignItems:"center", gap:12 }}>
+          <div style={{ width:36, height:36, background:C.accent, borderRadius:10, display:"flex", alignItems:"center", justifyContent:"center", fontSize:16, fontWeight:900, color:"#fff", flexShrink:0 }}>K</div>
+          <div>
+            <div style={{ fontSize:14, fontWeight:800, color:C.text }}>{settings.academyName}</div>
+            <div style={{ fontSize:11, color:C.muted }}>{settings.directorName}</div>
+          </div>
+          <button onClick={()=>setDrawerOpen(false)} style={{ marginLeft:"auto", fontSize:20, color:C.dim, background:"none", border:"none", cursor:"pointer", padding:"4px" }}>✕</button>
+        </div>
+
+        {/* 메뉴 목록 */}
+        <div style={{ flex:1, overflowY:"auto", padding:"10px 10px" }}>
+          {NAV.map(item => (
+            <button key={item.id} onClick={()=>{setNav(item.id);setDrawerOpen(false);}}
+              style={{ width:"100%", display:"flex", alignItems:"center", gap:12, padding:"12px 14px", borderRadius:12, marginBottom:3, background:nav===item.id?C.accentSoft:"transparent", border:"none", cursor:"pointer", textAlign:"left", position:"relative" }}>
+              <span style={{ fontSize:18, width:24, textAlign:"center", flexShrink:0, color:nav===item.id?C.accent:C.dim }}>{item.icon}</span>
+              <span style={{ fontSize:14, fontWeight:nav===item.id?700:500, color:nav===item.id?C.accent:C.text }}>{item.label}</span>
+              {item.id==="notice"&&unread>0&&(
+                <span style={{ marginLeft:"auto", background:C.red, color:"#fff", fontSize:10, fontWeight:700, width:18, height:18, borderRadius:"50%", display:"flex", alignItems:"center", justifyContent:"center" }}>{unread}</span>
+              )}
+              {nav===item.id && <div style={{ position:"absolute", left:0, top:"50%", transform:"translateY(-50%)", width:3, height:20, background:C.accent, borderRadius:2 }} />}
+            </button>
+          ))}
+        </div>
+
+        {/* 드로어 하단 */}
+        <div style={{ padding:"14px 16px", borderTop:`1px solid ${C.border}` }}>
+          <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+            <div style={{ width:32, height:32, borderRadius:"50%", background:"linear-gradient(135deg,#3B7EF6,#6366F1)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:13, fontWeight:700, color:"#fff" }}>
+              {settings.directorName[0]}
+            </div>
+            <div>
+              <div style={{ fontSize:13, fontWeight:600, color:C.text }}>{settings.directorName}</div>
+              <div style={{ fontSize:11, color:C.muted }}>원장</div>
+            </div>
+          </div>
+        </div>
       </nav>
     </div>
   );
@@ -678,67 +728,81 @@ function ClassesPanel({ store }) {
 // ── 시간표 ──
 function SchedulePanel({ store }) {
   const { classes, setClasses } = store;
-  const [modal, setModal] = useState(null); // null | class obj
+  const [modal, setModal] = useState(null);
   const [form, setForm] = useState({});
+  const [viewMode, setViewMode] = useState("week");
 
   const open = (c) => { setForm({...c}); setModal(c); };
-  const save = () => {
-    setClasses(p => p.map(c => c.id === form.id ? {...form} : c));
-    setModal(null);
-  };
+  const save = () => { setClasses(p => p.map(c => c.id === form.id ? {...form} : c)); setModal(null); };
   const toggleDay = (d) => setForm(p => ({...p, days: p.days?.includes(d) ? p.days.filter(x=>x!==d) : [...(p.days||[]), d]}));
 
   return <div className="fade">
-    <Hdr title="주간 시간표" sub="수업 카드를 클릭하면 수정할 수 있어요" />
-    <div className="grid-7">
+    <Hdr title="시간표" sub="수업 카드를 클릭하면 수정할 수 있어요" />
+
+    <div style={{ display:"flex", gap:4, marginBottom:16, background:C.card, borderRadius:10, padding:4, width:"fit-content", border:`1px solid ${C.border}` }}>
+      {[{id:"week",label:"📅 주간"},{id:"list",label:"📋 목록"}].map(m=>(
+        <button key={m.id} onClick={()=>setViewMode(m.id)} style={{ padding:"7px 16px", borderRadius:7, fontSize:13, fontWeight:600, border:"none", cursor:"pointer", background:viewMode===m.id?C.accent:"transparent", color:viewMode===m.id?"#fff":C.muted }}>{m.label}</button>
+      ))}
+    </div>
+
+    {viewMode==="week" && <div className="grid-7" style={{ marginBottom:16 }}>
       {DAYS.map((day, di) => {
         const dayClasses = classes.filter(c => c.days?.includes(day));
-        return <Card key={day} style={{ minHeight:240, padding:14 }}>
-          <div style={{ fontSize:13, fontWeight:700, color:di>=5?C.accent:C.text, marginBottom:12 }}>{day}</div>
-          <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-            {dayClasses.length === 0
-              ? <div style={{ fontSize:11, color:C.dim, textAlign:"center", paddingTop:16 }}>없음</div>
-              : dayClasses.map((c, i) => (
-                <div key={c.id} onClick={() => open(c)}
-                  style={{ background:COLORS_LIST[i%COLORS_LIST.length]+"12", borderLeft:`3px solid ${COLORS_LIST[i%COLORS_LIST.length]}`, borderRadius:8, padding:"9px 10px", cursor:"pointer", transition:"all 0.15s" }}
-                  onMouseEnter={e => e.currentTarget.style.opacity="0.75"}
-                  onMouseLeave={e => e.currentTarget.style.opacity="1"}>
-                  <div style={{ fontSize:10, color:COLORS_LIST[i%COLORS_LIST.length], fontWeight:700, marginBottom:3 }}>{c.time}</div>
-                  <div style={{ fontSize:11, fontWeight:600 }}>{c.name}</div>
-                  <div style={{ fontSize:10, color:C.muted }}>{c.room}</div>
-                  <div style={{ fontSize:9, color:C.dim, marginTop:3 }}>✏ 클릭하여 수정</div>
-                </div>
-              ))
+        const isWE = di>=5;
+        return <Card key={day} style={{ minHeight:100, padding:10, background:isWE?"#F8FAFF":C.card, border:`1px solid ${isWE?"#DBEAFE":C.border}` }}>
+          <div style={{ fontSize:12, fontWeight:800, color:isWE?C.accent:C.text, marginBottom:8, textAlign:"center", background:isWE?C.accentSoft:"transparent", borderRadius:5, padding:"2px 0" }}>{day}</div>
+          <div style={{ display:"flex", flexDirection:"column", gap:5 }}>
+            {dayClasses.length===0
+              ? <div style={{ fontSize:9, color:C.dim, textAlign:"center", paddingTop:6 }}>없음</div>
+              : dayClasses.map(c => {
+                  const idx = classes.findIndex(cl=>cl.id===c.id);
+                  const col = COLORS_LIST[idx%COLORS_LIST.length];
+                  return <div key={c.id} onClick={()=>open(c)}
+                    style={{ background:col+"15", borderLeft:`3px solid ${col}`, borderRadius:7, padding:"7px 7px", cursor:"pointer" }}
+                    onMouseEnter={e=>e.currentTarget.style.opacity="0.75"}
+                    onMouseLeave={e=>e.currentTarget.style.opacity="1"}>
+                    <div style={{ fontSize:9, color:col, fontWeight:700, marginBottom:2 }}>{c.time?.split(" ").pop()}</div>
+                    <div style={{ fontSize:10, fontWeight:700, lineHeight:1.3 }}>{c.name}</div>
+                    <div style={{ fontSize:9, color:C.muted }}>{c.room}</div>
+                  </div>;
+                })
             }
           </div>
         </Card>;
       })}
-    </div>
+    </div>}
 
-    {/* 전체 목록 - 카드형 */}
-    <div style={{ marginTop:16, display:"flex", flexDirection:"column", gap:8 }}>
-      <div style={{ fontSize:14, fontWeight:700, marginBottom:4 }}>전체 수업 목록</div>
-      {classes.map((c, i) => (
-        <Card key={c.id} style={{ padding:"14px 16px" }}>
-          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-            <div style={{ flex:1, minWidth:0 }}>
-              <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:5, flexWrap:"wrap" }}>
-                <div style={{ fontSize:14, fontWeight:700, color:COLORS_LIST[i%COLORS_LIST.length] }}>{c.name}</div>
-                {(c.days||[]).map(d => (
-                  <span key={d} style={{ fontSize:10, padding:"2px 6px", borderRadius:4, background:COLORS_LIST[i%COLORS_LIST.length]+"18", color:COLORS_LIST[i%COLORS_LIST.length], fontWeight:700 }}>{d}</span>
-                ))}
-              </div>
-              <div style={{ fontSize:12, color:C.muted }}>
-                {c.teacher} · {c.time} · {c.room}
-              </div>
-            </div>
-            <Btn small outline onClick={() => open(c)}>수정</Btn>
+    {viewMode==="list" && <div style={{ display:"flex", flexDirection:"column", gap:12, marginBottom:16 }}>
+      {DAYS.map((day, di) => {
+        const dayClasses = classes.filter(c => c.days?.includes(day));
+        if(!dayClasses.length) return null;
+        return <div key={day}>
+          <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:8 }}>
+            <div style={{ width:32, height:32, borderRadius:"50%", background:di>=5?C.accentSoft:C.border+"40", display:"flex", alignItems:"center", justifyContent:"center", fontSize:14, fontWeight:900, color:di>=5?C.accent:C.muted, flexShrink:0 }}>{day}</div>
+            <div style={{ flex:1, height:1, background:C.border }} />
           </div>
-        </Card>
-      ))}
-    </div>
+          {dayClasses.map(c => {
+            const idx = classes.findIndex(cl=>cl.id===c.id);
+            const col = COLORS_LIST[idx%COLORS_LIST.length];
+            return <div key={c.id} onClick={()=>open(c)}
+              style={{ display:"flex", alignItems:"center", gap:12, background:C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:"13px 16px", cursor:"pointer", borderLeft:`4px solid ${col}`, marginBottom:7 }}
+              onMouseEnter={e=>e.currentTarget.style.background=C.bg}
+              onMouseLeave={e=>e.currentTarget.style.background=C.card}>
+              <div style={{ width:42, height:42, borderRadius:10, background:col+"18", display:"flex", alignItems:"center", justifyContent:"center", fontSize:18, flexShrink:0 }}>📚</div>
+              <div style={{ flex:1, minWidth:0 }}>
+                <div style={{ fontSize:14, fontWeight:700, marginBottom:3 }}>{c.name}</div>
+                <div style={{ fontSize:12, color:C.muted }}>{c.teacher} 선생님 · {c.room}</div>
+              </div>
+              <div style={{ textAlign:"right", flexShrink:0 }}>
+                <div style={{ fontSize:13, fontWeight:700, color:col }}>{c.time?.split(" ").pop()}</div>
+                <div style={{ fontSize:10, color:C.dim, marginTop:2 }}>✏ 수정</div>
+              </div>
+            </div>;
+          })}
+        </div>;
+      })}
+    </div>}
 
-    {/* 수정 모달 */}
     {modal && <Modal title={`"${form.name}" 수정`} onClose={() => setModal(null)}>
       <Input label="반 이름" value={form.name||""} onChange={v=>setForm(p=>({...p,name:v}))} placeholder="예: 수학 심화반" />
       <Input label="담당 선생님" value={form.teacher||""} onChange={v=>setForm(p=>({...p,teacher:v}))} placeholder="선생님 이름" />
